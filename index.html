@@ -554,18 +554,19 @@ function load(){try{const t=localStorage.getItem(KEY);return t?JSON.parse(t):nul
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('この端末に保存できませんでした。「保存・読込」からファイルに書き出してください')}}
 
 function sampleState(){
-  const p1={id:'p_'+uid(),name:'医師 当直・日直',slots:[
-    {id:uid(),name:'日直',abbr:'日',start:'08:30',end:'17:00',need:1,days:[true,false,false,false,false,false,true],hol:'add'},
-    {id:uid(),name:'当直',abbr:'当',start:'17:00',end:'08:30',need:1,days:allDays(true),hol:'normal'}],
-    intD:0,intH:12,maxM:8,maxW:3,maxO:5,hardW:false,hardO:true};
-  const p2={id:'p_'+uid(),name:'外来（午前）',slots:[
-    {id:uid(),name:'午前外来',abbr:'外',start:'09:00',end:'12:30',need:2,days:[false,true,true,true,true,true,false],hol:'exclude'}],
-    intD:0,intH:0,maxM:14,maxW:3,maxO:5,hardW:false,hardO:true};
+  // 見本：どの職場でも使いやすい「日勤・夜勤」の2交代
+  const p1={id:'p_'+uid(),name:'日勤',code:'日',slots:[
+    {id:uid(),name:'日勤',abbr:'日',start:'09:00',end:'18:00',need:2,days:allDays(true),hol:'normal'}],
+    intD:0,intH:11,maxM:20,maxW:3,maxO:5,hardW:false,hardO:true,mode:'fixed',combos:[],fair:true};
+  const p2={id:'p_'+uid(),name:'夜勤',code:'夜',slots:[
+    {id:uid(),name:'夜勤',abbr:'夜',start:'18:00',end:'09:00',need:1,days:allDays(true),hol:'normal'}],
+    intD:1,intH:0,maxM:8,maxW:2,maxO:5,hardW:false,hardO:true,mode:'fixed',combos:[],fair:true};
   const mk=(n,pats)=>({id:'u_'+uid(),name:n,pats,sp:blankSp()});
-  const users=[mk('田中',[p1.id,p2.id]),mk('佐藤',[p1.id,p2.id]),mk('鈴木',[p1.id]),mk('高橋',[p1.id]),mk('伊藤',[p1.id]),mk('渡辺',[p1.id]),mk('山本',[p2.id]),mk('中村',[p2.id])];
-  users[1].sp.ng.push({allDay:true,start:'00:00',end:'00:00',days:[false,false,false,true,false,false,false],hol:false});
-  users[2].sp.max=4;
-  return{v:1,month:nextMonth(),settings:defSettings(),patterns:[p1,p2],users,wishes:{},extraHol:[],results:{}};
+  const users=[mk('田中',[p1.id,p2.id]),mk('佐藤',[p1.id,p2.id]),mk('鈴木',[p1.id,p2.id]),mk('高橋',[p1.id,p2.id]),mk('伊藤',[p1.id,p2.id]),mk('渡辺',[p1.id]),mk('山本',[p1.id]),mk('中村',[p1.id])];
+  users[1].sp.ng.push({allDay:true,start:'00:00',end:'00:00',days:[false,false,false,true,false,false,false],hol:false}); // 佐藤：水曜は勤務できない
+  users[6].sp.max=12; // 山本：月12回まで
+  const settings=Object.assign(defSettings(),{intMode:'perPattern',consec:5});
+  return migrate({v:1,month:nextMonth(),settings,patterns:[p1,p2],users,wishD:{},extraHol:[],results:{},balance:[]});
 }
 function migrate(s){
   s.patterns=s.patterns||[];s.users=s.users||[];s.extraHol=s.extraHol||[];s.results=s.results||{};
@@ -767,6 +768,8 @@ function buildProblem(){
   // 公平さ（回数をそろえる）：パターンで「そろえる」がオンで、週の目安がない人だけ
   const groupP=S.patterns.map((p,pi)=>p.fair===false?[]:U.map((E,k)=>E.pidx.includes(pi)&&E.wkMin==null&&E.wkMax==null?k:-1).filter(k=>k>=0));
   const groupS=slots.map(o=>groupP[o.pi]);
+  // 合計の回数もそろえる：回数をそろえるパターンに入っている人どうし
+  const groupAll=[...new Set(groupP.flat())];
   // 週（月曜始まり）と、週の目安の換算
   const off0=(mi.wd[1]+6)%7,week={};for(let d=1;d<=mi.nd;d++)week[d]=Math.floor((d-1+off0)/7);
   const nW=week[mi.nd]+1;
@@ -788,7 +791,7 @@ function buildProblem(){
   const bal=(S.balance||[]).map(r=>{const a=uix[r.a];if(a==null)return null;
     const bs=r.b==='*'?U.map((E,k)=>k).filter(k=>k!==a):(uix[r.b]!=null&&uix[r.b]!==a?[uix[r.b]]:[]);
     return bs.length?{a,bs,rel:r.rel==='gt'?'gt':'ge',diff:isNum(r.diff)?r.diff:null}:null}).filter(Boolean);
-  return{mi,inst,U,can,base,avoid,cand,bal,excl,errors,byPat,groupP,groupS,nP:S.patterns.length,nS:slots.length,slots,prevInfo,groups,week,nW};
+  return{mi,inst,U,can,base,avoid,cand,bal,excl,errors,byPat,groupP,groupS,nP:S.patterns.length,nS:slots.length,slots,prevInfo,groups,week,nW,groupAll};
 }
 /* 休み希望に当たる日（当たらなければ0）。offPrev のときは、休み希望日の前日に始まり当日にかかる勤務も当たる */
 function offDay(E,x){
@@ -800,7 +803,7 @@ function offDay(E,x){
 /* ---------- 勤務表の計算（最適化：焼きなまし法） ----------
    必ず守る条件を破ると大きな減点、希望がかなわない・偏りは小さな減点。
    減点の合計がいちばん小さい組み合わせを探します。 */
-const WH=1000,W_WISHW=20,W_WISHO=40,W_FAIR=4,W_FAIRWK=3,W_FAIRSL=2,W_WEEK=60,W_SHARE=6,W_PREF=6,W_CONSEC=80,W_AVOID=50,W_BAL=70,W_SPREAD=8;
+const WH=1000,W_WISHW=20,W_WISHO=40,W_FAIR=4,W_FAIRWK=3,W_FAIRSL=2,W_WEEK=60,W_SHARE=6,W_PREF=6,W_CONSEC=80,W_AVOID=50,W_BAL=70,W_SPREAD=8,W_FAIRTOT=30;
 function makeSolver(P){
   const I=P.inst,U=P.U,nU=U.length,nP=P.nP,nS=P.nS,GR=P.groups;
   const asg=I.map(x=>new Array(x.need).fill(-1));
@@ -837,7 +840,9 @@ function makeSolver(P){
     uh[u]=hard;us[u]=soft;
   }
   function sq(G,arr,idx){let s=0,q=0;for(const k of G){const v=arr[k][idx];s+=v;q+=v*v}return q-s*s/G.length}
+
   function fair(){let f=0;
+    if(P.groupAll.length>1){let s1=0,q=0;for(const k of P.groupAll){const v=uL[k].length;s1+=v;q+=v*v}f+=W_FAIRTOT*(q-s1*s1/P.groupAll.length)}
     for(let p=0;p<nP;p++){const G=P.groupP[p];if(G.length<2)continue;f+=W_FAIR*sq(G,cP,p)+W_FAIRWK*sq(G,cW,p)}
     for(let s=0;s<nS;s++){const G=P.groupS[s];if(G.length<2)continue;f+=W_FAIRSL*sq(G,cS,s)}
     return f}
