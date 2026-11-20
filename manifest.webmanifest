@@ -1,7 +1,7 @@
 {
-  "name": "ShiftFlow 勤務表メーカー",
-  "short_name": "ShiftFlow",
-  "description": "端末の中だけで動く勤務表作成アプリ",
+  "name": "Mirulife Shift",
+  "short_name": "Mirulife Shift",
+  "description": "シフト管理を、もっとスマートに。端末の中だけで動く勤務表作成アプリ",
   "lang": "ja",
   "start_url": "./",
   "scope": "./",
@@ -9,8 +9,23 @@
   "background_color": "#f3f6f6",
   "theme_color": "#0f6b63",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
