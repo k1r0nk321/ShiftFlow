@@ -1145,12 +1145,12 @@ function rPatterns(){
   const hl=Object.entries(mi.hol).filter(([d,n])=>n).map(([d,n])=>`${lab(mi,+d)} ${n}`).join('、')||'なし';
   let h=`<div class="lead">勤務の「型」を登録します。型ごとに、時間帯（開始・終了・人数・曜日・祝日の扱い）と勤務条件を決めます。<br>終了が開始より早い時刻なら「翌日まで」の勤務（夜勤など）として扱います。</div>`+rPatternCsv()+`
   <section class="card" id="globalSettings"><h2>${ico('gear')}全体の設定</h2><div class="grid">
-    <label>休み希望日の前日の夜勤（休み希望日にかかる勤務）<span>${sel('settings.offPrev',!!S.settings.offPrev,{false:'入れてよい（休み希望日に始まる勤務だけ入れない）',true:'入れない（前日の夜勤なども入れない）'})}</span>
-      <small>メンバーごとに変えることもできます（② メンバー登録）</small></label>
-    <label>連続勤務の上限（全員の基本）<span>${num('settings.consec',S.settings.consec,'なし')} 日まで　<small>空欄＝制限なし</small></span>
-      <small>勤務のない日（土日・祝日・休み）をはさむと数え直します。人によって変える場合は ② メンバー登録で</small></label>
-    <label>複数のパターンに入っている人の勤務間インターバル<span>${sel('settings.intMode',S.settings.intMode,{common:'全パターン共通（いちばん長いものを使う）',perPattern:'パターンごと（終わった勤務のパターンの値を使う）'})}</span>
-      <small>パターンごと：例）日勤（0時間）のあとの夜勤はOK、夜勤（1日）明けの日勤は不可</small></label>
+    <label>休み希望日の前の晩の夜勤<span>${sel('settings.offPrev',!!S.settings.offPrev,{false:'入れてよい',true:'入れない'})}</span>
+      <small>夜勤のように日をまたぐ勤務は、休み希望日の朝まで続きます。<br>例：10日が休み希望のとき<br>・入れてよい → 9日の夜勤（10日の朝まで）には入ることがある<br>・入れない → 9日の夜勤にも入らない（10日をまるごと空ける）<br>人ごとに変えるときは「メンバー」→「特別な勤務条件」で。</small></label>
+    <label>続けて勤務できる日数<span>${num('settings.consec',S.settings.consec,'なし')} 日まで</span>
+      <small>例：5 → 6日続けての勤務は入れない。空欄なら制限なし。<br>勤務のない日（休み・休日）をはさむと、また1日目から数えます。<br>人ごとに変えるときは「メンバー」→「特別な勤務条件」で。</small></label>
+    <label>勤務と勤務の間の休み（2つ以上のパターンに入る人）<span>${sel('settings.intMode',S.settings.intMode,{common:'いちばん長い時間にそろえる',perPattern:'終わった勤務の時間を使う'})}</span>
+      <small>「勤務間インターバル」（次の勤務までにあける時間）は、パターンごとに決めます。2つ以上のパターンに入る人にどれを使うかを選びます。<br>例：日勤は「0時間」、夜勤は「1日」のとき<br>・いちばん長い時間にそろえる → 日勤のあとも1日あける<br>・終わった勤務の時間を使う → 日勤のあとすぐ夜勤OK、夜勤のあとは1日あける</small></label>
   </div></section>`;
   h+=`<section class="card"><div class="cardhead"><h2>${ico('grid')}勤務パターン設定</h2><button class="primary small" data-act="addPat">＋ パターン追加</button></div>
     <div class="slotgrid">${S.patterns.flatMap((p,pi)=>p.slots.map(sl=>{const ov=toMin(sl.end)<=toMin(sl.start);
@@ -1241,7 +1241,7 @@ function rUsers(){
           <label>勤務希望日の上限<span>${num(P+'.maxW',sp.maxW)} 日</span></label>
           <label>休み希望日の上限<span>${num(P+'.maxO',sp.maxO)} 日</span></label>
           <label>連続勤務の上限<span>${num(P+'.consecMax',sp.consecMax,S.settings.consec??'なし')} 日まで</span><small>全体の上限より大きくすると「基本は全体の上限まで、どうしても必要なときだけこの日数まで」になります</small></label>
-          <label>休み希望日の前日の夜勤<span>${sel(P+'.offPrev',sp.offPrev==null?'':sp.offPrev,{'':`全体の設定どおり（${S.settings.offPrev?'入れない':'入れてよい'}）`,false:'入れてよい',true:'入れない'})}</span></label>
+          <label>休み希望日の前の晩の夜勤<span>${sel(P+'.offPrev',sp.offPrev==null?'':sp.offPrev,{'':`全体の設定どおり（${S.settings.offPrev?'入れない':'入れてよい'}）`,false:'入れてよい',true:'入れない'})}</span><small>「入れない」：休み希望日の前の晩の夜勤（休み希望日の朝まで続く勤務）にも入らない</small></label>
         </div>
         <p class="hint">この人のインターバルを入れると、パターンの設定に関係なく、すべての勤務の間にその時間をあけます。</p>
         <h3>回数の目安</h3>
@@ -1253,7 +1253,7 @@ function rUsers(){
         <div class="hint" style="margin-top:8px">時間帯ごとの月の上限（空欄＝制限なし、0＝その時間帯には入らない）</div>
         <div class="grid">${E.pats.map(p=>p.slots.map(sl=>`<label>${esc(p.name)}／${esc(sl.name||'(無名)')}<span>${num(`${P}.slotMax.${sl.id}`,sp.slotMax[sl.id])} 回</span></label>`).join('')).join('')}</div>
       </details>
-      <div class="eff">この人に使う条件：インターバル ${E.own||S.settings.intMode!=='perPattern'?fmtGap(E.interval):'パターンごと'}／連勤 ${E.consecHard==null?'制限なし':(E.consecSoft!=null?`基本${E.consecSoft}日・最大${E.consecHard}日`:E.consecHard+'日まで')}／休み希望の前日の夜勤 ${E.offPrev?'入れない':'入れてよい'}／月の上限 ${E.max==null?'パターンどおり':E.max+'回'}／勤務希望 ${lim(E.maxW)}／休み希望 ${lim(E.maxO)}</div>
+      <div class="eff">この人に使う条件：インターバル ${E.own||S.settings.intMode!=='perPattern'?fmtGap(E.interval):'パターンごと'}／連勤 ${E.consecHard==null?'制限なし':(E.consecSoft!=null?`基本${E.consecSoft}日・最大${E.consecHard}日`:E.consecHard+'日まで')}／休み希望日の前の晩の夜勤 ${E.offPrev?'入れない':'入れてよい'}／月の上限 ${E.max==null?'パターンどおり':E.max+'回'}／勤務希望 ${lim(E.maxW)}／休み希望 ${lim(E.maxO)}</div>
     </div></details>`;
   });
   h+=`<p><button class="primary" data-act="addUser">＋ メンバーを追加</button></p>`;
