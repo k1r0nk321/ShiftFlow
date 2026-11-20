@@ -474,6 +474,30 @@ table.mlist td{padding:10px 8px}
   .acts .btns{width:100%}
   .sumgrid{grid-template-columns:1fr}
 }
+
+/* 使い方（？） */
+.pagehead{display:flex;align-items:center;gap:12px}
+.pagehead h1{margin-bottom:14px}
+.helpbtn{width:34px;height:34px;border-radius:50%;border:2px solid var(--pri);background:#fff;color:var(--pri);font-size:19px;font-weight:800;line-height:1;padding:0;display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px;box-shadow:var(--shadow);cursor:pointer}
+.helpbtn:hover{background:var(--pri);color:#fff}
+.hero{position:relative}
+.hb-hero{position:absolute;top:10px;right:10px;margin:0;width:32px;height:32px;font-size:18px}
+#helpModal .mback{position:fixed;inset:0;background:rgba(10,30,28,.4);z-index:70}
+#helpModal .mpanel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(760px,94vw);max-height:88vh;background:#fff;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.25);z-index:71;display:flex;flex-direction:column;overflow:hidden}
+#helpModal .mhead{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line);background:linear-gradient(90deg,#e3f5f2,#fff)}
+#helpModal .mhead h2{margin:0;font-size:18px;display:flex;align-items:center;gap:8px}
+#helpModal .mhead h2 svg{width:22px;height:22px;color:var(--pri)}
+#helpModal .mbody{padding:16px 18px 20px;overflow:auto}
+.hsteps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.hsteps li{display:grid;grid-template-columns:30px 40px 1fr;gap:10px;align-items:start;border:1px solid #e3ebea;border-radius:14px;padding:12px}
+.hnum{width:28px;height:28px;border-radius:50%;background:var(--pri);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
+.hico svg{width:32px;height:32px;color:var(--pri)}
+.hbody b{font-size:15px}.hbody p{margin:4px 0 8px;font-size:13.5px;color:var(--ink);line-height:1.6}
+.htips{margin-top:14px;background:#f5faf9;border-radius:14px;padding:12px 16px}
+.htips h3{display:flex;align-items:center;gap:6px;margin:0 0 6px}.htips h3 svg{width:18px;height:18px}
+.htips ul{margin:0;padding-left:18px;font-size:13.5px;line-height:1.7}
+@media (max-width:900px){.hsteps li{grid-template-columns:28px 1fr}.hsteps .hico{display:none}#helpModal .mpanel{width:96vw;max-height:90vh}}
+@media print{#helpModal{display:none}}
 </style>
 </head>
 <body>
@@ -994,7 +1018,7 @@ const BNAV=['home','pat','usr','wish','gen'];
 function nextNav(tab,label){return `<div class="nextnav noprint"><button class="primary" data-tab="${tab}">${label} →</button></div>`}
 function pageHead(){
   const mi=monthInfo(),t=(TABS.find(x=>x[0]===UI.tab)||TABS[0])[1];
-  return `<div class="pagehead noprint"><h1>${t}</h1></div>
+  return `<div class="pagehead noprint"><h1>${t}</h1>${UI.tab==='home'?`<button class="helpbtn" data-act="helpOpen" aria-label="使い方" title="使い方">?</button>`:''}</div>
   <div class="phrow noprint"><div class="period">${ico('cal')}<span class="pl">対象期間</span>
     <label class="pselect" title="期間（開始する月）を選ぶ"><b id="plabel">${esc(mi.label)}</b>${ico('chevD')}<input type="month" id="month" value="${S.month}"></label>
     <button data-act="pm" data-k="-1" aria-label="前の期間" id="pprev">${ico('chevL')}</button><button data-act="pm" data-k="1" aria-label="次の期間" id="pnext">${ico('chevR')}</button></div>
@@ -1023,6 +1047,8 @@ function render(){
   $('#bnav').innerHTML=BNAV.map(k=>{const t=TABS.find(x=>x[0]===k);const on=UI.tab===k||(k==='gen'&&UI.tab==='chk')||(k==='home'&&(UI.tab==='hist'||UI.tab==='data'||UI.tab==='help'));return `<button data-tab="${k}" class="${on?'on':''}">${ico(t[3])}<span>${t[2]}</span></button>`}).join('');
   $('#drawer').innerHTML=UI.drawer?`<div class="dback" data-act="drawer"></div><div class="dpanel"><div class="brand"><img class="logoimg" src="${$('.logoimg').src}" alt=""><span>ShiftFlow</span></div>${TABS.map(([k,l,,ic])=>`<button data-tab="${k}" class="${UI.tab===k?'on':''}">${ico(ic)}<span>${l}</span></button>`).join('')}<hr><button data-act="goSettings">${ico('gear')}<span>設定</span></button><button data-tab="help">${ico('help')}<span>ヘルプ</span></button></div>`:'';
   document.body.classList.toggle('tab-home',UI.tab==='home');
+  let hm=document.getElementById('helpModal');if(!hm){hm=document.createElement('div');hm.id='helpModal';document.body.appendChild(hm)}
+  hm.innerHTML=UI.helpOpen?`<div class="mback" data-act="helpClose"></div><div class="mpanel" role="dialog" aria-modal="true" aria-label="使い方"><div class="mhead"><h2>${ico('help')}ShiftFlow の使い方</h2><button class="iconbtn" data-act="helpClose" aria-label="閉じる">✕</button></div><div class="mbody"><p class="hint" style="margin-top:0">上から順に進めると、勤務表ができあがります。</p>${helpContent()}</div></div>`:'';
   const f={home:rHome,pat:rPatterns,usr:rUsers,wish:rWish,gen:rGen,chk:rCheck,hist:rHist,data:rData,help:rHelp}[UI.tab];
   const head=UI.tab==='help'?`<div class="pagehead"><h1>ヘルプ</h1></div>`:pageHead();
   $('#app').innerHTML=head+f()+({pat:nextNav('usr','次へ：② メンバー登録'),usr:nextNav('wish','次へ：③ 希望入力')}[UI.tab]||'')+(UI.busy?`<div class="busy">勤務表を作成しています…</div>`:'');
@@ -1065,7 +1091,7 @@ function rHome(){
   const wrate=nU?Math.round(wishers/nU*100):0;
   const rate=fs&&fs.req?Math.round(fs.got/fs.req*100):null,lack=fs?fs.req-fs.got:null;
   const stat=(icon,label,val,unit,cls='',vcls='')=>`<div class="stat ${cls}"><div class="si">${ico(icon)}</div><div style="min-width:0"><div class="sl">${label}</div><div class="sv ${vcls}">${val}<small>${unit}</small></div></div></div>`;
-  let h=`<div class="hero only-m"><div class="ht">勤務表作成を、<br>もっとスマートに。</div><div class="hart">${ART}</div></div>`;
+  let h=`<div class="hero only-m"><button class="helpbtn hb-hero" data-act="helpOpen" aria-label="使い方" title="使い方">?</button><div class="ht">勤務表作成を、<br>もっとスマートに。</div><div class="hart">${ART}</div></div>`;
   h+=`<div class="tiles">${[['pat','grid','勤務パターン','シフトの種類・時間'],['usr','users','メンバー','職員の登録・条件'],['wish','calcheck','勤務希望','希望勤務・希望休'],['gen','spark','勤務表作成','自動作成・調整'],['chk','table','勤務表確認','日別・個人別・集計'],['hist','clock','過去の勤務表','過去のデータ参照']].map(([t,i,b,sm])=>`<button class="tile" data-tab="${t}">${ico(i)}<b>${b}</b><small>${sm}</small></button>`).join('')}
     <button class="bigbtn" data-act="solveGo">${ico('plus')}新しい勤務表を作成</button></div>`;
   h+=`<div class="stats">${stat('users','登録メンバー',nU,'名')}${stat('cal','勤務パターン',nP,'種')}
@@ -1087,15 +1113,24 @@ function rHome(){
       <section class="card"><h2>${ico('users')}次のアクション</h2>${acts}</section></div></div>`;
   return h;
 }
+/* 使い方の説明（ヘルプ画面と、ダッシュボードの「？」の両方で使う） */
+function helpContent(){
+  const st=[['pat','grid','勤務パターンを登録する','勤務の「型」を作ります。時間帯（開始・終了・人数）、繰り返す曜日、祝日の扱い、勤務間インターバル・月の上限などの条件を入れます。「1が1人、または2と5が1人ずつ」のような組み合わせも設定できます。'],
+    ['usr','users','メンバーを登録する','名前と、入れるパターンを選びます。行を押すと、その人だけの条件（勤務できない曜日・時間、週の回数の目安、連勤の上限、時間帯ごとの上限 など）を入れられます。名簿CSV（Excel）でまとめて登録もできます。'],
+    ['wish','calcheck','勤務希望・休み希望を入れる','名前を選び、「勤務希望」か「休み希望」を選んでからカレンダーの日付を押します。Googleフォームでメンバーから集めて、まとめて取り込むこともできます。'],
+    ['gen','spark','勤務表を自動作成する','上の「新しい勤務表を作成」を押すと、条件を守りながら、できるだけ公平になるように自動で作ります。どうしても作れないときは、その理由と見直し方を表示します。'],
+    ['chk','table','できた勤務表を確認する','日別・個人別・集計を切り替えて確かめます。かなわなかった希望や目安も表示します。CSV（Excel）での書き出しや印刷もできます。'],
+    ['data','download','データを保存する','データはこの端末のブラウザの中に自動で保存されます。消えたときに備えて、ときどき「ファイルに書き出す」で保管してください。']];
+  return `<ol class="hsteps">${st.map(([t,i,b,txt],k)=>`<li><div class="hnum">${k+1}</div><div class="hico">${ico(i)}</div><div class="hbody"><b>${b}</b><p>${txt}</p><button class="small outline" data-tab="${t}">この画面を開く →</button></div></li>`).join('')}</ol>
+  <div class="htips"><h3>${ico('check')}知っておくと便利なこと</h3><ul>
+    <li><b>対象期間</b>：画面上部の ‹ › で期間を移動します。「勤務表作成」で作成開始日（例：21日〜翌月20日）を選べます。</li>
+    <li><b>ダッシュボード</b>：カレンダーは「月／週」を切り替えられます。ベル（🔔）に赤い点があるときは、確認が必要なお知らせがあります。</li>
+    <li><b>ホーム画面に置く</b>：iPhoneは Safari の「共有」→「ホーム画面に追加」、Androidは Chrome の「︙」→「ホーム画面に追加」。iPhoneでは、ホーム画面から開いたときと Safari で開いたときでデータの保存場所が別になります。</li>
+    <li><b>データの安全</b>：計算はこの端末の中だけで行い、データはインターネットに送信しません（Googleフォーム連携で、フォームを作る・回答を受け取るときを除く）。</li>
+  </ul></div>`;
+}
 function rHelp(){
-  return `<section class="card"><h2>${ico('help')}使い方</h2><ol class="steps">
-    <li><b>勤務パターン</b>：勤務の「型」（時間帯・人数・曜日・祝日の扱い・勤務条件）を登録します。</li>
-    <li><b>メンバー</b>：名前と入るパターンを登録し、人ごとの条件（勤務できない日、週の回数の目安 など）を入れます。名簿CSVでもまとめて登録できます。</li>
-    <li><b>勤務希望</b>：期間ごとの勤務希望・休み希望を入れます。Googleフォームで集めて取り込むこともできます。</li>
-    <li><b>勤務表作成</b>：「新しい勤務表を作成」を押すと、条件を守り、できるだけ公平になるように自動で作ります。作れないときは理由を表示します。</li>
-    <li><b>勤務表確認</b>：日別・個人別・集計で確かめ、CSV（Excel）や印刷で出力します。</li>
-    <li><b>保存・出力</b>：データはこの端末のブラウザの中に保存されます。定期的にファイルに書き出して保管してください。</li></ol>
-    <p class="hint">計算はこの端末の中だけで行い、データはインターネットに送信しません（Googleフォーム連携を使うときの、フォームの作成と回答の受け取りを除く）。</p></section>`;
+  return `<section class="card"><h2>${ico('help')}使い方</h2>${helpContent()}</section>`;
 }
 function rPatterns(){
   const mi=monthInfo();
@@ -1945,12 +1980,13 @@ document.addEventListener('change',e=>{
   setPath(S,path,v);save();
   if(el.dataset.rr!==undefined||UI.tab==='usr')render();
 });
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&UI.helpOpen){UI.helpOpen=false;render()}});
 document.addEventListener('click',e=>{const l=e.target.closest('.pselect');if(!l)return;const i=l.querySelector('input');if(i&&i.showPicker&&e.target!==i){try{i.showPicker()}catch(x){}}});
 document.addEventListener('toggle',e=>{if(e.target&&e.target.id==='gfbox'){UI.gopen=e.target.open;return}});
 document.addEventListener('toggle',e=>{const el=e.target;if(!el.matches||!el.matches('details.ucard'))return;const id=el.dataset.uid;
   if(el.open)UI.openU.add(id);else UI.openU.delete(id);const t=el.querySelector('.tog');if(t)t.textContent=el.open?'閉じる':'設定を開く'},true);
 document.addEventListener('click',e=>{
-  const t=e.target.closest('[data-tab]');if(t){UI.drawer=false;UI.tab=t.dataset.tab;render();window.scrollTo(0,0);return}
+  const t=e.target.closest('[data-tab]');if(t){UI.drawer=false;UI.helpOpen=false;UI.tab=t.dataset.tab;render();window.scrollTo(0,0);return}
   const b=e.target.closest('[data-act]');if(!b)return;
   const a=b.dataset.act,D=b.dataset;
   const A={
@@ -1977,6 +2013,8 @@ document.addEventListener('click',e=>{
     calMode(){UI.calMode=D.m;if(D.m==='week'){const mi=monthInfo();const t=new Date();const iso=t.getFullYear()+'-'+pad(t.getMonth()+1)+'-'+pad(t.getDate());let d=Object.keys(mi.iso).find(k=>mi.iso[k]===iso);UI.calWk=d?Math.floor((+d-1+mi.wd[1])/7):0}},
     wk(){UI.calWk=Math.max(0,UI.calWk+(+D.k))},
     drawer(){UI.drawer=!UI.drawer},
+    helpOpen(){UI.helpOpen=true},
+    helpClose(){UI.helpOpen=false},
     bell(){UI.tab='home';UI.drawer=false;save();render();setTimeout(()=>{const el=$('#noticeCard');if(el)el.scrollIntoView({behavior:'smooth',block:'center'})},30);return false},
     goSettings(){UI.tab='pat';UI.drawer=false;save();render();setTimeout(()=>{const el=$('#globalSettings');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},30);return false},
     goPat(){const pi=D.pi;setTimeout(()=>{const el=$('#pat-'+pi);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},30);return false},
