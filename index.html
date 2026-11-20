@@ -50,6 +50,10 @@ details{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
 summary{cursor:pointer;color:var(--pri);font-weight:600;font-size:14px}
 details.csvbox{margin-top:0;border-top:1px solid var(--line);padding-top:12px}
 .csvsum{font-size:15px;padding:2px 0}
+.steps{padding-left:20px;font-size:14px}.steps li{margin-bottom:8px}
+.gfinfo{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fafcfc}
+.btnlink{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:13px;color:var(--ink);text-decoration:none;background:#fff}
+textarea{font-family:inherit;border:1px solid var(--line);border-radius:8px;padding:8px}
 details.csvbox[open] .csvsum{margin-bottom:8px}
 .eff{font-size:13px;color:var(--sub);margin-top:8px}
 .ublist{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
@@ -332,6 +336,7 @@ details.ucard .ubody{padding:12px 16px 16px}
 <input type="file" id="fileIn" accept=".json,application/json" hidden>
 <input type="file" id="csvIn" accept=".csv,.txt,text/csv" hidden>
 <input type="file" id="pcsvIn" accept=".csv,.txt,text/csv" hidden>
+<input type="file" id="gcsvIn" accept=".csv,.tsv,.txt,text/csv" hidden>
 <script>
 'use strict';
 /* =========================================================
@@ -351,7 +356,7 @@ const isNum=v=>typeof v==='number'&&isFinite(v);
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),2600)}
 function nextMonth(){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+1);return d.getFullYear()+'-'+pad(d.getMonth()+1)}
 function blankSp(){return{ng:[],intD:null,intH:null,max:null,maxW:null,maxO:null,offPrev:null,slotMax:{},wkMin:null,wkMax:null,patShare:{},prefDays:allDays(false),prefShare:null,consecMax:null}}
-function defSettings(){return{offPrev:false,intMode:'common',keep:null,consec:null,startDay:1}}
+function defSettings(){return{offPrev:false,intMode:'common',keep:null,consec:null,startDay:1,gas:{url:'',key:''}}}
 function addMonth(m,k){const [y,mm]=m.split('-').map(Number);const d=new Date(y,mm-1+k,1);return d.getFullYear()+'-'+pad(d.getMonth()+1)}
 function thisMonth(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)}
 const ymLabel=m=>{const [y,mm]=m.split('-').map(Number);return `${y}年${mm}月`};
@@ -384,6 +389,8 @@ function migrate(s){
   delete s.wishes;
   if(!s.month)s.month=nextMonth();
   s.settings=Object.assign(defSettings(),s.settings||{});
+  if(!s.settings.gas||typeof s.settings.gas!=='object')s.settings.gas={url:'',key:''};
+  if(!s.gforms||typeof s.gforms!=='object')s.gforms={};
   if(!Array.isArray(s.balance))s.balance=[];
   s.patterns.forEach(p=>{p.slots=p.slots||[];if(!p.mode)p.mode='fixed';p.combos=p.combos||[];if(p.fair===undefined)p.fair=true;p.slots.forEach(x=>{if(!x.days)x.days=allDays(true);if(!x.hol)x.hol='normal'})});
   s.users.forEach(u=>{u.pats=u.pats||[];u.sp=Object.assign(blankSp(),u.sp||{});['slotMax','patShare'].forEach(k=>{if(!u.sp[k]||typeof u.sp[k]!=='object')u.sp[k]={}});if(!Array.isArray(u.sp.prefDays))u.sp.prefDays=allDays(false)});
@@ -1363,9 +1370,172 @@ function rPatternCsv(){
   return h+`</details>`;
 }
 
+
+/* =========== Googleフォーム連携 ===========
+   A. かんたん連携：Google Apps Script（管理者のGoogleアカウントで動く小さなプログラム）を1回置くと、
+      アプリのボタンでフォームを作り、回答を取り込める（通信するのはこの時だけ）
+   B. 貼り付け／CSV：回答のスプレッドシートをコピーして貼り付けるか、CSVファイルを読み込む */
+const GAS_CODE=[
+"// 勤務表メーカー 連携用スクリプト（Googleフォームの作成と、回答の受け渡し）",
+"// 合言葉（勤務表メーカーが自動で作ったもの。変えないでください）",
+"const KEY = '__KEY__';",
+"",
+"function doGet(e) {",
+"  const p = (e && e.parameter) || {};",
+"  if (p.key !== KEY) return out_({ ok: false, error: '合言葉が違います' });",
+"  try {",
+"    if (p.action === 'ping') return out_({ ok: true });",
+"    if (p.action === 'create') return out_(createForm_(JSON.parse(p.data)));",
+"    if (p.action === 'responses') return out_(responses_(p.formId));",
+"    return out_({ ok: false, error: '不明な操作です' });",
+"  } catch (err) {",
+"    return out_({ ok: false, error: String(err && err.message || err) });",
+"  }",
+"}",
+"",
+"function out_(o) {",
+"  return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);",
+"}",
+"",
+"function createForm_(d) {",
+"  const form = FormApp.create(d.title);",
+"  form.setDescription(d.description || '');",
+"  form.addListItem().setTitle('お名前').setRequired(true).setChoiceValues(d.names);",
+"  if (d.maxW !== 0) {",
+"    const w = form.addCheckboxItem().setTitle('勤務希望日').setHelpText(d.workHelp || '');",
+"    w.setChoiceValues(d.dates);",
+"    if (d.maxW) w.setValidation(FormApp.createCheckboxValidation().requireSelectAtMost(d.maxW).build());",
+"  }",
+"  if (d.maxO !== 0) {",
+"    const o = form.addCheckboxItem().setTitle('休み希望日').setHelpText(d.offHelp || '');",
+"    o.setChoiceValues(d.dates);",
+"    if (d.maxO) o.setValidation(FormApp.createCheckboxValidation().requireSelectAtMost(d.maxO).build());",
+"  }",
+"  form.addParagraphTextItem().setTitle('備考');",
+"  return { ok: true, formId: form.getId(), url: form.getPublishedUrl(), edit: form.getEditUrl() };",
+"}",
+"",
+"function responses_(formId) {",
+"  const form = FormApp.openById(formId);",
+"  const list = form.getResponses().map(function (r) {",
+"    const o = { ts: r.getTimestamp().getTime(), name: '', work: [], off: [], note: '' };",
+"    r.getItemResponses().forEach(function (ir) {",
+"      const t = ir.getItem().getTitle(), v = ir.getResponse();",
+"      if (t === 'お名前') o.name = v;",
+"      else if (t === '勤務希望日') o.work = v;",
+"      else if (t === '休み希望日') o.off = v;",
+"      else if (t === '備考') o.note = v;",
+"    });",
+"    return o;",
+"  });",
+"  return { ok: true, title: form.getTitle(), responses: list };",
+"}"].join('\n');
+function gasKey(){const g=S.settings.gas;if(!g.key){g.key=uid()+uid();save()}return g.key}
+function gasCode(){return GAS_CODE.replace('__KEY__',gasKey())}
+async function gasCall(params){
+  const g=S.settings.gas;if(!/^https:\/\/script\.google\.com\/.+\/exec/.test(g.url||''))throw new Error('ウェブアプリのURLが正しくありません（https://script.google.com/macros/s/…/exec の形）');
+  const u=new URL(g.url);u.searchParams.set('key',gasKey());Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));
+  let r;try{r=await fetch(u.toString())}catch(e){throw new Error('Googleに接続できませんでした（インターネット接続、またはスクリプトの「アクセスできるユーザー：全員」を確認してください）')}
+  let j;try{j=await r.json()}catch(e){throw new Error('Googleからの返事を読めませんでした（デプロイの設定を確認してください）')}
+  if(!j.ok)throw new Error(j.error||'失敗しました');return j;
+}
+function copyText(t){
+  const done=()=>toast('コピーしました');
+  if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(t).then(done,()=>fallback());else fallback();
+  function fallback(){const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');done()}catch(e){toast('コピーできませんでした')}a.remove()}
+}
+const dayLabel=(mi,d)=>`${lab(mi,d)}(${WD[mi.wd[d]]})`;
+function formPayload(){
+  const mi=monthInfo(),P=buildProblem();
+  const days=[...new Set(P.inst.map(x=>x.d))].sort((a,b)=>a-b);
+  const ef=S.users.map(u=>eff(u));
+  const same=k=>{const v=ef.map(e=>e[k]);return v.length&&v.every(x=>x===v[0])?v[0]:null};
+  const maxW=same('maxW'),maxO=same('maxO');
+  const lim=(arr,k)=>[...new Set(S.users.map((u,i)=>ef[i][k]==null?null:`${u.name}：${ef[i][k]}日まで`).filter(Boolean))].join('、');
+  return{title:`勤務希望（${mi.label}）`,
+    description:`${mi.label}の勤務希望・休み希望を選んでください。勤務がある日だけを並べています。同じ人が何度か送った場合は、最後に送った内容を使います。`,
+    names:S.users.map(u=>u.name||'(名前なし)'),dates:days.map(d=>dayLabel(mi,d)),maxW,maxO,
+    workHelp:maxW!=null?`${maxW}日まで選べます。`:(lim(0,'maxW')?`上限：${lim(0,'maxW')}`:''),
+    offHelp:maxO!=null?`${maxO}日まで選べます。`:(lim(0,'maxO')?`上限：${lim(0,'maxO')}`:'')};
+}
+/* 回答の行 {name, work, off, note}（work/off は配列か文字列）から、取り込み内容を作る */
+function gformPreview(rows,source){
+  const mi=monthInfo(),P=buildProblem(),md2d={};for(let d=1;d<=mi.nd;d++)md2d[mi.md[d]]=d;
+  const parseDates=v=>{const ds=[],bad=[];(Array.isArray(v)?v:[v]).forEach(t=>{const s2=zen2han(t||'');if(!s2.trim())return;const re=/(\d{1,2})\s*[\/月]\s*(\d{1,2})/g;let m,found=false;
+    while(m=re.exec(s2)){found=true;const d=md2d[`${+m[1]}/${+m[2]}`];if(d)ds.push(d);else bad.push(`${+m[1]}/${+m[2]}`)}if(!found)bad.push(s2.trim())});
+    return{ds:[...new Set(ds)].sort((a,b)=>a-b),bad}};
+  const last={};rows.forEach(r=>{const n=String(r.name||'').trim();if(n)last[nz(n)]=Object.assign({},r,{name:n})});
+  const out=Object.values(last).map(r=>{
+    const u=S.users.find(x=>nz(x.name)===nz(r.name)),warn=[];
+    let W=parseDates(r.work),O=parseDates(r.off);
+    if(W.bad.length)warn.push(`期間外か読めない勤務希望：${W.bad.join('、')}`);
+    if(O.bad.length)warn.push(`期間外か読めない休み希望：${O.bad.join('、')}`);
+    let work=W.ds,off=O.ds;
+    const both=work.filter(d=>off.includes(d));if(both.length){work=work.filter(d=>!both.includes(d));warn.push(`同じ日に勤務希望と休み希望：${both.map(d=>lab(mi,d)).join('、')}（休み希望として取り込みます）`)}
+    if(u){const k=P.U.findIndex(e=>e.id===u.id),av=new Set(P.inst.filter((x,i)=>k>=0&&P.base[i][k]).map(x=>x.d));
+      const na=work.filter(d=>!av.has(d));if(na.length){work=work.filter(d=>av.has(d));warn.push(`入れる勤務がない日の勤務希望：${na.map(d=>lab(mi,d)).join('、')}（取り込みません）`)}
+      const E=eff(u);if(E.maxW!=null&&work.length>E.maxW)warn.push(`勤務希望が上限（${E.maxW}日）を超えています`);if(E.maxO!=null&&off.length>E.maxO)warn.push(`休み希望が上限（${E.maxO}日）を超えています`)}
+    else warn.push('名簿にいない名前です（取り込みません）');
+    return{name:r.name,uid:u?u.id:null,work,off,note:String(r.note||''),warn};
+  });
+  return{rows:out,source,replace:true,label:mi.label,month:S.month};
+}
+function gformFromTable(text){
+  const rows=parseCSV(text);if(rows.length<2)return{err:'見出しの行と、1行以上の回答が必要です。'};
+  const head=rows[0].map(h=>String(h).trim());const find=re=>head.findIndex(h=>re.test(h));
+  const cN=find(/名前|氏名/),cW=find(/勤務希望/),cO=find(/休み希望|休暇希望|休希望/),cR=find(/備考/);
+  if(cN<0||(cW<0&&cO<0))return{err:'見出しに「お名前」と「勤務希望日」または「休み希望日」の列が必要です（フォームの回答のスプレッドシートを、見出しの行も含めてコピーしてください）。'};
+  return gformPreview(rows.slice(1).map(r=>({name:r[cN],work:cW>=0?r[cW]:'',off:cO>=0?r[cO]:'',note:cR>=0?r[cR]:''})),'貼り付け・CSV');
+}
+function applyGform(pv){
+  const mi=monthInfo();let n=0;
+  pv.rows.forEach(r=>{if(!r.uid)return;n++;
+    if(pv.replace)for(let d=1;d<=mi.nd;d++)setWish(r.uid,d,null);
+    r.work.forEach(d=>setWish(r.uid,d,'W'));r.off.forEach(d=>setWish(r.uid,d,'O'))});
+  return n;
+}
+function rGform(){
+  const g=S.settings.gas,mi=monthInfo(),gf=S.gforms[S.month],pv=UI.gimp&&UI.gimp.month===S.month?UI.gimp:null;
+  let h=`<details class="card csvbox" ${pv||UI.gopen?'open':''} id="gfbox"><summary class="csvsum">Googleフォームで希望を集める・取り込む</summary>`;
+  if(UI.gmsg)h+=`<div class="box ${UI.gmsg.err?'err':'ok'}" style="margin-top:8px">${esc(UI.gmsg.t)}</div>`;
+  h+=`<h3>A. かんたん連携（ボタンでフォーム作成・回答の取り込み）</h3>`;
+  if(!g.url){
+    h+=`<p class="hint">最初に1回だけ、あなたのGoogleアカウントに連携用のスクリプトを置きます（5分ほど）。</p>
+    <ol class="steps">
+      <li>下の「連携用スクリプトをコピー」を押します。<br><button class="small" data-act="gCopyCode">連携用スクリプトをコピー</button></li>
+      <li><b>script.google.com</b> を開き、「新しいプロジェクト」を押します。最初から書かれている文字を全部消して貼り付け、保存（💾）します。</li>
+      <li>右上の「<b>デプロイ</b>」→「新しいデプロイ」→ 種類の選択（⚙）で「<b>ウェブアプリ</b>」を選びます。<br>「次のユーザーとして実行：<b>自分</b>」「アクセスできるユーザー：<b>全員</b>」にして「デプロイ」を押します。</li>
+      <li>「アクセスを承認」→ 自分のアカウントを選びます。「Googleで確認されていません」と出たら「詳細」→「（プロジェクト名）に移動」→「許可」を押します（自分で置いたスクリプトです）。</li>
+      <li>表示された「<b>ウェブアプリのURL</b>」（https://script.google.com/macros/s/…/exec）をコピーして、下に貼り付けます。</li>
+    </ol>
+    <div class="row"><input type="text" style="flex:1;min-width:240px" placeholder="https://script.google.com/macros/s/…/exec" data-path="settings.gas.url" data-rr value=""></div>
+    <p class="hint">このURLと合言葉（アプリが自動で作り、スクリプトに書き込み済み）を知っている人だけが回答を読めます。URLは他の人に教えないでください。病院のGoogleアカウント（Workspace）では「全員」が選べないことがあります。その場合は個人のアカウントを使うか、下の B の方法を使ってください。</p>`;
+  }else{
+    h+=`<div class="row" style="margin-bottom:8px"><span class="hint" style="margin:0">連携：設定済み</span><button class="small" data-act="gPing">接続を確かめる</button><button class="small" data-act="gCopyCode">スクリプトをもう一度コピー</button><button class="small danger" data-act="gReset">連携をやめる</button></div>`;
+    if(!gf)h+=`<p>${esc(mi.label)}のフォームはまだありません。今の名簿と勤務がある日から、フォームを自動で作ります。</p><button class="primary" data-act="gCreate" ${UI.gbusy?'disabled':''}>${esc(mi.label)}のフォームを作る</button>`;
+    else h+=`<div class="gfinfo"><div><b>${esc(mi.label)}のフォーム</b>（作成：${esc(gf.created)}）</div>
+      <div class="row" style="margin:6px 0"><input type="text" readonly value="${esc(gf.url)}" style="flex:1;min-width:220px"><button class="small" data-act="gCopyUrl">回答用URLをコピー</button><a class="small btnlink" href="${esc(gf.edit)}" target="_blank" rel="noopener">フォームを編集</a></div>
+      <p class="hint">回答用URLをメンバーに送ってください（LINE・メールなど）。回答がそろったら「回答を取り込む」を押します。</p>
+      <div class="row"><button class="primary" data-act="gFetch" ${UI.gbusy?'disabled':''}>回答を取り込む</button><button class="small danger" data-act="gForget">このフォームの登録を外す</button></div></div>`;
+  }
+  h+=`<h3>B. 回答を貼り付けて取り込む（設定なし）</h3>
+    <p class="hint">フォームの「回答」→「スプレッドシートにリンク」で開いた表を、<b>見出しの行も含めて</b>選んでコピーし、下に貼り付けます。CSVファイル（ダウンロードしたもの）も使えます。</p>
+    <textarea id="gpaste" rows="4" style="width:100%;font-size:13px" placeholder="ここに貼り付け（タイムスタンプ／お名前／勤務希望日／休み希望日 …）"></textarea>
+    <div class="row" style="margin-top:6px"><button class="primary small" data-act="gPaste">貼り付けた内容を確認</button><button class="small" data-act="gCsv">CSVファイルを選ぶ</button></div>`;
+  if(UI.gerr)h+=`<div class="box err" style="margin-top:10px">${esc(UI.gerr)}</div>`;
+  if(pv){const ok=pv.rows.filter(r=>r.uid).length;
+    h+=`<h3>取り込む内容の確認（${esc(pv.label)}／${esc(pv.source)}：${ok}人）</h3>
+    <div class="tablewrap"><table class="sheet"><tr><th class="nm">名前</th><th>勤務希望</th><th>休み希望</th><th>備考</th><th>注意</th></tr>
+    ${pv.rows.map(r=>`<tr><td class="nm">${esc(r.name)}</td><td style="text-align:left;white-space:normal">${r.work.map(d=>lab(mi,d)).join('、')||'—'}</td><td style="text-align:left;white-space:normal">${r.off.map(d=>lab(mi,d)).join('、')||'—'}</td><td style="text-align:left;white-space:normal;max-width:200px">${esc(r.note)}</td><td style="text-align:left;white-space:normal;color:var(--off);min-width:180px">${esc(r.warn.join(' / '))}</td></tr>`).join('')}
+    </table></div>
+    <label class="row" style="margin:10px 0"><input type="checkbox" id="greplace" ${pv.replace?'checked':''}> 取り込む人の、この期間の今の希望を置き換える（外すと追加になります）</label>
+    <div class="row"><button class="primary" data-act="gApply" ${ok?'':'disabled'}>この内容で取り込む</button><button data-act="gCancel">やめる</button></div>`}
+  return h+`</details>`;
+}
+
 function rWish(){
   const mi=monthInfo();
-  let h=`<div class="lead"><b>${esc(mi.label)}</b>の希望を入れます。①名前を選ぶ → ②「勤務希望」か「休み希望」を選ぶ → ③日付を押す。もう一度押すと消えます。</div>`;
+  let h=`<div class="lead"><b>${esc(mi.label)}</b>の希望を入れます。①名前を選ぶ → ②「勤務希望」か「休み希望」を選ぶ → ③日付を押す。もう一度押すと消えます。</div>`+rGform();
   if(!S.users.length)return h+`<div class="card">メンバーが登録されていません。「② メンバー」で登録してください。</div>`+nextNav('usr','② メンバー登録へ戻る');
   const P=buildProblem();
   h+=`<div class="ublist scrollx">${S.users.map(u=>{const w=periodWishes(u.id,mi),E=eff(u);const nW=Object.values(w).filter(v=>v==='W').length,nO=Object.values(w).filter(v=>v==='O').length;
@@ -1532,6 +1702,11 @@ document.addEventListener('change',e=>{
     if(del.length&&!confirm(`次の月の勤務表と希望が消えます。よろしいですか？\n${del.map(ymLabel).join('、')}`)){render();return}
     S.settings.keep=v;purgeOld();save();render();return}
   if(el.id==='csvDel'){if(UI.csv)UI.csv.del=el.checked;return}
+  if(el.id==='greplace'){if(UI.gimp)UI.gimp.replace=el.checked;return}
+  if(el.id==='gcsvIn'){const f=el.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{
+      const buf=new Uint8Array(rd.result);let text;
+      try{text=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(x){try{text=new TextDecoder('shift_jis').decode(buf)}catch(y){text=new TextDecoder('utf-8').decode(buf)}}
+      const r=gformFromTable(text);UI.gerr=r.err||null;UI.gimp=r.err?null:r;UI.gopen=true;UI.gmsg=null;el.value='';render()};rd.readAsArrayBuffer(f);return}
   if(el.id==='pcsvIn'){const f=el.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{
       const buf=new Uint8Array(rd.result);let text;
       try{text=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(x){try{text=new TextDecoder('shift_jis').decode(buf)}catch(y){text=new TextDecoder('utf-8').decode(buf)}}
@@ -1553,6 +1728,7 @@ document.addEventListener('change',e=>{
   setPath(S,path,v);save();
   if(el.dataset.rr!==undefined||UI.tab==='usr')render();
 });
+document.addEventListener('toggle',e=>{if(e.target&&e.target.id==='gfbox'){UI.gopen=e.target.open;return}});
 document.addEventListener('toggle',e=>{const el=e.target;if(!el.matches||!el.matches('details.ucard'))return;const id=el.dataset.uid;
   if(el.open)UI.openU.add(id);else UI.openU.delete(id);const t=el.querySelector('.tog');if(t)t.textContent=el.open?'閉じる':'設定を開く'},true);
 document.addEventListener('click',e=>{
@@ -1580,6 +1756,22 @@ document.addEventListener('click',e=>{
     mode(){UI.mode=D.m},
     clearWish(){if(!confirm('この人のこの期間の希望をすべて消しますか？'))return false;const mi=monthInfo();for(let d=1;d<=mi.nd;d++)setWish(UI.wu,d,null)},
     view(){UI.view=D.v},
+    gCopyCode(){copyText(gasCode());return false},
+    gCopyUrl(){const g=S.gforms[S.month];if(g)copyText(g.url);return false},
+    gReset(){if(!confirm('Googleフォーム連携をやめますか？（Google側のスクリプトとフォームは残ります）'))return false;S.settings.gas.url='';UI.gmsg=null},
+    gForget(){if(!confirm('この期間のフォームの登録を外しますか？（Google側のフォームと回答は残ります）'))return false;delete S.gforms[S.month]},
+    gPing(){UI.gbusy=true;gasCall({action:'ping'}).then(()=>{UI.gmsg={t:'Googleとつながっています'}},e=>{UI.gmsg={t:e.message,err:true}}).finally(()=>{UI.gbusy=false;render()});return false},
+    gCreate(){if(!S.users.length){toast('先にメンバーを登録してください');return false}
+      const d=formPayload();if(!d.dates.length){toast('この期間に勤務のある日がありません');return false}
+      UI.gbusy=true;UI.gmsg={t:'フォームを作っています…'};render();
+      gasCall({action:'create',data:JSON.stringify(d)}).then(j=>{S.gforms[S.month]={formId:j.formId,url:j.url,edit:j.edit,created:new Date().toLocaleString('ja-JP')};save();UI.gmsg={t:'フォームを作りました。回答用URLをメンバーに送ってください。'}},e=>{UI.gmsg={t:'フォームを作れませんでした：'+e.message,err:true}}).finally(()=>{UI.gbusy=false;render()});return false},
+    gFetch(){const g=S.gforms[S.month];if(!g)return false;UI.gbusy=true;UI.gmsg={t:'回答を読み込んでいます…'};render();
+      gasCall({action:'responses',formId:g.formId}).then(j=>{const rs=j.responses||[];rs.sort((a,b)=>a.ts-b.ts);UI.gimp=gformPreview(rs,'Googleフォーム');UI.gerr=null;UI.gmsg={t:`回答 ${rs.length}件を読み込みました。内容を確認して取り込んでください。`}},e=>{UI.gmsg={t:'回答を読み込めませんでした：'+e.message,err:true}}).finally(()=>{UI.gbusy=false;render()});return false},
+    gPaste(){const t=($('#gpaste')||{}).value||'';const r=gformFromTable(t);UI.gerr=r.err||null;UI.gimp=r.err?null:r;UI.gopen=true;UI.gmsg=null},
+    gCsv(){$('#gcsvIn').click();return false},
+    gCancel(){UI.gimp=null},
+    gApply(){const pv=UI.gimp;if(!pv)return false;if(pv.month!==S.month){toast('期間が変わっています。もう一度読み込んでください');UI.gimp=null;return}
+      const n=applyGform(pv);UI.gimp=null;UI.gmsg={t:`${n}人分の希望を取り込みました。`}},
     pickPV(){UI.pv=D.id},
     pm(){S.month=addMonth(S.month,+D.k)},
     openU(){UI.openU.add(D.id);setTimeout(()=>{const el=document.querySelector(`details.ucard[data-uid="${D.id}"]`);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},30)},
