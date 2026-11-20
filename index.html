@@ -1149,8 +1149,8 @@ function rPatterns(){
       <small>夜勤のように日をまたぐ勤務は、休み希望日の朝まで続きます。<br>例：10日が休み希望のとき<br>・入れてよい → 9日の夜勤（10日の朝まで）には入ることがある<br>・入れない → 9日の夜勤にも入らない（10日をまるごと空ける）<br>人ごとに変えるときは「メンバー」→「特別な勤務条件」で。</small></label>
     <label>続けて勤務できる日数<span>${num('settings.consec',S.settings.consec,'なし')} 日まで</span>
       <small>例：5 → 6日続けての勤務は入れない。空欄なら制限なし。<br>勤務のない日（休み・休日）をはさむと、また1日目から数えます。<br>人ごとに変えるときは「メンバー」→「特別な勤務条件」で。</small></label>
-    <label>勤務と勤務の間の休み（2つ以上のパターンに入る人）<span>${sel('settings.intMode',S.settings.intMode,{common:'いちばん長い時間にそろえる',perPattern:'終わった勤務の時間を使う'})}</span>
-      <small>「勤務間インターバル」（次の勤務までにあける時間）は、パターンごとに決めます。2つ以上のパターンに入る人にどれを使うかを選びます。<br>例：日勤は「0時間」、夜勤は「1日」のとき<br>・いちばん長い時間にそろえる → 日勤のあとも1日あける<br>・終わった勤務の時間を使う → 日勤のあとすぐ夜勤OK、夜勤のあとは1日あける</small></label>
+    <label>かけもちする人の「次の勤務までの時間」<span>${sel('settings.intMode',S.settings.intMode,{common:'長い方にそろえる',perPattern:'直前の勤務に合わせる'})}</span>
+      <small>勤務のあと次の勤務まで最低あける時間（勤務間インターバル）は、パターンごとに決めています。日勤と夜勤の両方に入る人のように、<b>あける時間が違うパターンをかけもちする人</b>だけに関係する設定です（1つのパターンだけの人は関係ありません）。<br>例：日勤のあとは「0時間」、夜勤のあとは「1日」あける設定のとき<br>・長い方にそろえる → 日勤のあとも1日あける（その日の夜勤にも、翌日の日勤にも入れない）<br>・直前の勤務に合わせる → 日勤のあとは続けて夜勤に入れる。夜勤のあとは1日あける</small></label>
   </div></section>`;
   h+=`<section class="card"><div class="cardhead"><h2>${ico('grid')}勤務パターン設定</h2><button class="primary small" data-act="addPat">＋ パターン追加</button></div>
     <div class="slotgrid">${S.patterns.flatMap((p,pi)=>p.slots.map(sl=>{const ov=toMin(sl.end)<=toMin(sl.start);
@@ -1253,7 +1253,7 @@ function rUsers(){
         <div class="hint" style="margin-top:8px">時間帯ごとの月の上限（空欄＝制限なし、0＝その時間帯には入らない）</div>
         <div class="grid">${E.pats.map(p=>p.slots.map(sl=>`<label>${esc(p.name)}／${esc(sl.name||'(無名)')}<span>${num(`${P}.slotMax.${sl.id}`,sp.slotMax[sl.id])} 回</span></label>`).join('')).join('')}</div>
       </details>
-      <div class="eff">この人に使う条件：インターバル ${E.own||S.settings.intMode!=='perPattern'?fmtGap(E.interval):'パターンごと'}／連勤 ${E.consecHard==null?'制限なし':(E.consecSoft!=null?`基本${E.consecSoft}日・最大${E.consecHard}日`:E.consecHard+'日まで')}／休み希望日の前の晩の夜勤 ${E.offPrev?'入れない':'入れてよい'}／月の上限 ${E.max==null?'パターンどおり':E.max+'回'}／勤務希望 ${lim(E.maxW)}／休み希望 ${lim(E.maxO)}</div>
+      <div class="eff">この人に使う条件：次の勤務までの時間 ${E.own||S.settings.intMode!=='perPattern'?fmtGap(E.interval):'直前の勤務に合わせる'}／連勤 ${E.consecHard==null?'制限なし':(E.consecSoft!=null?`基本${E.consecSoft}日・最大${E.consecHard}日`:E.consecHard+'日まで')}／休み希望日の前の晩の夜勤 ${E.offPrev?'入れない':'入れてよい'}／月の上限 ${E.max==null?'パターンどおり':E.max+'回'}／勤務希望 ${lim(E.maxW)}／休み希望 ${lim(E.maxO)}</div>
     </div></details>`;
   });
   h+=`<p><button class="primary" data-act="addUser">＋ メンバーを追加</button></p>`;
