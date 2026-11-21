@@ -1029,7 +1029,18 @@ function buildProblem(){
     const weeks=[];for(let w=0;w<nW;w++){let d=null;
       for(let dd=1;dd<=mi.nd;dd++){if(week[dd]!==w)continue;if(String(r.day)!=='first'&&mi.wd[dd]!==+r.day)continue;if(inst.some(x=>x.d===dd&&x.pi===pi)){d=dd;break}}
       if(d!=null)weeks.push({w,d,is:inst.map((x,i)=>x.d===d&&x.pi===pi?i:-1).filter(i=>i>=0)})}
-    return weeks.length?{pi,mem,weeks,day:String(r.day)}:null}).filter(Boolean);
+    // 前の期間の勤務表があれば、その最後の担当から続けて交代する（月をまたぐ週は前の期間で済んでいるので数えない）
+    let prevM=-1,prevLab='';
+    const pr2=S.results[addMonth(S.month,-1)];
+    if(pr2&&!pr2.pre&&pr2.inst&&pr2.mi){const pmi=pr2.mi,dt=d=>new Date(pmi.Y,pmi.M-1,(pmi.s0||1)+d-1),mon=t=>{const x=new Date(t);x.setDate(x.getDate()-((x.getDay()+6)%7));return x.getTime()};
+      const days=[...new Set(pr2.inst.filter(x=>x.pid===r.pid).map(x=>x.d))].sort((a,b)=>a-b);const firstOf={};
+      days.forEach(d=>{const t=dt(d);if(String(r.day)!=='first'&&t.getDay()!==+r.day)return;const k=mon(t);if(!(k in firstOf))firstOf[k]=d});
+      const ks=Object.keys(firstOf).map(Number).sort((a,b)=>a-b);
+      if(ks.length){const ld=firstOf[ks[ks.length-1]];let m=-1;
+        pr2.inst.filter(x=>x.pid===r.pid&&x.d===ld).forEach(x=>x.uids.forEach(id=>{const j=mem.indexOf(uix[id]);if(j>=0&&(m<0||j<m))m=j}));
+        prevM=m;prevLab=lab(pmi,ld);
+        if(weeks.length&&mon(new Date(mi.Y,mi.M-1,(mi.s0||1)+weeks[0].d-1))===ks[ks.length-1])weeks.shift()}}
+    return weeks.length?{pi,mem,weeks,day:String(r.day),prevM,prevLab}:null}).filter(Boolean);
   return{mi,inst,U,can,base,avoid,cand,bal,excl,errors,byPat,groupP,groupS,nP:S.patterns.length,nS:slots.length,slots,prevInfo,groups,week,nW,groupAll,rot};
 }
 /* 休み希望に当たる日（当たらなければ0）。offPrev のときは、休み希望日の前日に始まり当日にかかる勤務も当たる */
@@ -1042,7 +1053,7 @@ function offDay(E,x){
 /* ---------- 勤務表の計算（最適化：焼きなまし法） ----------
    必ず守る条件を破ると大きな減点、希望がかなわない・偏りは小さな減点。
    減点の合計がいちばん小さい組み合わせを探します。 */
-const W_ROT=60,W_ROTNONE=40,W_ROTPREF=6,W_WEEKEACH=150,WH=1000,W_WISHW=20,W_WISHO=40,W_FAIR=4,W_FAIRWK=3,W_FAIRSL=2,W_WEEK=60,W_SHARE=6,W_PREF=6,W_CONSEC=80,W_AVOID=50,W_BAL=70,W_SPREAD=8,W_FAIRTOT=30;
+const W_ROT=150,W_ROTNONE=200,W_ROTPREF=6,W_WEEKEACH=150,WH=1000,W_WISHW=20,W_WISHO=40,W_FAIR=4,W_FAIRWK=3,W_FAIRSL=2,W_WEEK=60,W_SHARE=6,W_PREF=6,W_CONSEC=80,W_AVOID=50,W_BAL=70,W_SPREAD=8,W_FAIRTOT=30;
 function makeSolver(P){
   const I=P.inst,U=P.U,nU=U.length,nP=P.nP,nS=P.nS,GR=P.groups;
   const asg=I.map(x=>new Array(x.need).fill(-1));
@@ -1092,7 +1103,7 @@ function makeSolver(P){
     let d=Math.max(0,(r.rel==='gt'?cb+1:cb)-ca);if(r.diff!=null)d+=Math.max(0,ca-cb-r.diff);return d}
   function balance(){let p=0;for(const r of P.bal)for(const b of r.bs)p+=balDev(r,b);return p*W_BAL}
   function rotSeq(r){return r.weeks.map(wk=>{let m=-1;for(const i of wk.is)for(let q=0;q<req[i];q++){const j=r.mem.indexOf(asg[i][q]);if(j>=0&&(m<0||j<m))m=j}return m})}
-  function rotation(){if(!P.rot.length)return 0;let pen=0;for(const r of P.rot){let prev=-1;for(const m of rotSeq(r)){if(m<0)pen+=W_ROTNONE;else{if(m>0)pen+=W_ROTPREF;if(m===prev)pen+=W_ROT}prev=m}}return pen}
+  function rotation(){if(!P.rot.length)return 0;let pen=0;for(const r of P.rot){let prev=r.prevM,first=true;for(const m of rotSeq(r)){if(first&&r.prevM<0&&m>0)pen+=30;first=false;if(m<0)pen+=W_ROTNONE;else{if(m>0)pen+=W_ROTPREF;if(m===prev)pen+=W_ROT}prev=m}}return pen}
   function total(){let h=unfilled,s=0;for(let u=0;u<nU;u++){h+=uh[u];s+=us[u]}return h*WH+s+fair()+balance()+rotation()}
   function setPos(i,k,u){const old=asg[i][k];if(old===u)return old;
     if(old>=0){rem(old,i);evalUser(old)}else unfilled--;
@@ -1202,8 +1213,9 @@ function makeSolver(P){
     for(const r of P.rot){const sq2=rotSeq(r),pn=S.patterns[r.pi].name,lb=`${pn}・${rotDayShort(r.day)}`,nm=k=>U[k].name;
       const none=r.weeks.filter((wk,j)=>sq2[j]<0).map(wk=>fd(mi,wk.d));
       if(none.length)soft.push(`週ごとの交代（${lb}）：${none.join('、')} は担当（${r.mem.map(nm).join('・')}）が入っていません`);
-      const same=[];for(let j=1;j<sq2.length;j++)if(sq2[j]>=0&&sq2[j]===sq2[j-1])same.push(`${fd(mi,r.weeks[j-1].d)}と${fd(mi,r.weeks[j].d)}は続けて${nm(r.mem[sq2[j]])}さん`);
-      if(same.length)soft.push(`週ごとの交代（${lb}）：${same.join('、')}`)}
+      const same=[];if(sq2.length&&sq2[0]>=0&&sq2[0]===r.prevM)same.push(`前の期間の${r.prevLab}と${fd(mi,r.weeks[0].d)}は続けて${nm(r.mem[sq2[0]])}さん`);
+      for(let j=1;j<sq2.length;j++)if(sq2[j]>=0&&sq2[j]===sq2[j-1])same.push(`${fd(mi,r.weeks[j-1].d)}と${fd(mi,r.weeks[j].d)}は続けて${nm(r.mem[sq2[j]])}さん`);
+      if(same.length)soft.push(`週ごとの交代（${lb}）：${same.join('、')}（「計算の時間」を「じっくり」にすると交代できることがあります）`)}
     for(const r of P.bal)for(const b of r.bs)if(balDev(r,b)){const ca=uL[r.a].length,cb=uL[b].length;
       soft.push(`回数のバランス：${U[r.a].name}さん（${ca}回）を${U[b].name}さん（${cb}回）${REL_TXT[r.rel]||REL_TXT.ge}${r.diff!=null?`（差は${r.diff}回まで）`:''}する目安が守れませんでした`)}
     return{viol,soft,hard:hardSum()};
@@ -1535,7 +1547,7 @@ function rUsers(){
     <button class="small" data-act="addBal" ${S.users.length<2?'disabled':''}>＋ ルールを追加</button></section>`;
   const po={};S.patterns.forEach(p=>po[p.id]=p.name||'(無名)');
   h+=`<section class="card"><h2>週ごとの交代</h2>
-    <p class="hint">週明けの勤務などを、決めた人たちで週ごとに交代で担当します（できるだけ）。無理な週は、1人目を優先します。<br>例：「A（外来）」の「週の最初の勤務日（週明け）」を、DDさん → EEさん で交代（無理なときはDDさん）</p>
+    <p class="hint">週明けの勤務などを、決めた人たちで週ごとに交代で担当します（できるだけ）。無理な週は、1人目を優先します。前の期間の勤務表がこのアプリにあれば、その最後の担当から続けて交代します。<br>例：「A（外来）」の「週の最初の勤務日（週明け）」を、DDさん → EEさん で交代（無理なときはDDさん）</p>
     ${S.rotations.length?`<div class="tablewrap"><table class="edit stack">${S.rotations.map((r,i)=>`<tr>
       <td data-label="">${sel(`rotations.${i}.pid`,r.pid,po)} の</td><td data-label="">${sel(`rotations.${i}.day`,r.day,ROT_DAY)} を</td>
       <td data-label="">${[0,1,2].map(j=>sel(`rotations.${i}.members.${j}`,r.members[j]||'',Object.assign({'':j<2?'（選ぶ）':'（なし）'},uo))).join(' → ')} で交代</td>
