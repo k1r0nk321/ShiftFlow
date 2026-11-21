@@ -1,6 +1,7 @@
 // ご意見・ご要望の受付（Mirulife Shift）
 // - 内容は Vercel Blob（非公開ストア）に1件ずつJSONで保存します。Vercel の管理画面 Storage → Blob で読めます。
 // - 環境変数 RESEND_API_KEY と FEEDBACK_TO が設定されていれば、届いたときにメールでも知らせます（任意）。
+//   送信元は FEEDBACK_FROM（なければ Resend で認証済みの no-reply@mirulife.jp）。
 // - 勤務表のデータは受け取りません（画面から送るのは、書かれた内容・画面名・端末の種類だけ）。
 const { put } = require('@vercel/blob');
 
@@ -43,6 +44,7 @@ module.exports = async (req, res) => {
     await put(`feedback/${d}/${id}.json`, JSON.stringify(item, null, 1), {
       access: 'private', contentType: 'application/json; charset=utf-8', addRandomSuffix: false,
     });
+    console.log('feedback saved', d, item.kind);
   } catch (e) {
     console.error('feedback save failed', e && e.message);
     return res.status(500).json({ ok: false });
@@ -50,13 +52,14 @@ module.exports = async (req, res) => {
 
   const key = process.env.RESEND_API_KEY, to = process.env.FEEDBACK_TO;
   if (key && to) {
+    let r = null;
     try {
       const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-      await fetch('https://api.resend.com/emails', {
+      r = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          from: process.env.FEEDBACK_FROM || 'Mirulife Shift <onboarding@resend.dev>',
+          from: process.env.FEEDBACK_FROM || 'Mirulife Shift <no-reply@mirulife.jp>',
           to: to.split(',').map(s => s.trim()).filter(Boolean),
           reply_to: item.email || undefined,
           subject: `【Mirulife Shift ご意見】${KINDS[item.kind]}`,
@@ -64,6 +67,7 @@ module.exports = async (req, res) => {
         }),
       });
     } catch (e) { console.error('feedback mail failed', e && e.message); }
+    if (r && !r.ok) console.error('feedback mail failed', r.status, (await r.text().catch(() => '')).slice(0, 300));
   }
   return res.status(200).json({ ok: true });
 };
