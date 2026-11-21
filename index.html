@@ -58,6 +58,11 @@ details{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
 summary{cursor:pointer;color:var(--pri);font-weight:600;font-size:14px}
 details.csvbox{margin-top:0;border-top:1px solid var(--line);padding-top:12px}
 .csvsum{font-size:15px;padding:2px 0}
+details.fold>summary.csvsum{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700;cursor:pointer}
+details.fold>summary.csvsum svg{width:18px;height:18px;color:var(--pri)}
+details.fold>summary.csvsum{list-style:none}details.fold>summary.csvsum::-webkit-details-marker{display:none}
+details.fold>summary.csvsum::before{content:'▶';font-size:12px;color:var(--pri)}details.fold[open]>summary.csvsum::before{content:'▼'}
+details.fold .fsub{font-size:12px;font-weight:400;color:var(--sub)}
 .steps{padding-left:20px;font-size:14px}.steps li{margin-bottom:8px}
 .gfinfo{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fafcfc}
 .btnlink{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:13px;color:var(--ink);text-decoration:none;background:#fff}
@@ -737,7 +742,7 @@ function migrate(s){
 }
 const FRESH=!load();
 let S=migrate(load()||sampleState());
-const UI={calMode:'month',calWk:0,drawer:false,tab:'home',wu:null,mode:'W',budget:3000,busy:false,hist:null,view:'day',pv:null,openU:new Set(),openP:new Set()};
+const UI={calMode:'month',calWk:0,drawer:false,tab:'home',wu:null,mode:'W',budget:3000,busy:false,hist:null,view:'day',pv:null,openU:new Set(),openP:new Set(),fold:{}};
 /* 保存期間を過ぎた月の勤務表・希望を消す（monthsToPurge で対象を確認） */
 function monthsToPurge(keep){
   if(keep==null)return[];const cut=addMonth(thisMonth(),-keep);
@@ -1312,14 +1317,14 @@ function rPatterns(){
   const mi=monthInfo();
   const hl=Object.entries(mi.hol).filter(([d,n])=>n).map(([d,n])=>`${lab(mi,+d)} ${n}`).join('、')||'なし';
   let h=`<div class="lead">勤務の「型」を登録します。型ごとに、時間帯（開始・終了・人数・曜日・祝日の扱い）と勤務条件を決めます。<br>終了が開始より早い時刻なら「翌日まで」の勤務（夜勤など）として扱います。名前を押すと、そのパターンの設定が開きます。</div>`;
-  const gs=`<section class="card" id="globalSettings"><h2>${ico('gear')}全体の設定</h2><div class="grid">
+  const gs=`<details class="card csvbox fold" id="globalSettings" data-fold="gs" ${UI.fold.gs?'open':''}><summary class="csvsum">${ico('gear')}全体の設定<span class="fsub">（夜勤の前の休み・連勤・かけもちの間隔）</span></summary><div class="grid">
     <label>休み希望日の前の晩の夜勤<span>${sel('settings.offPrev',!!S.settings.offPrev,{false:'入れてよい',true:'入れない'})}</span>
       <small>夜勤のように日をまたぐ勤務は、休み希望日の朝まで続きます。<br>例：10日が休み希望のとき<br>・入れてよい → 9日の夜勤（10日の朝まで）には入ることがある<br>・入れない → 9日の夜勤にも入らない（10日をまるごと空ける）<br>人ごとに変えるときは「メンバー」→「特別な勤務条件」で。</small></label>
     <label>続けて勤務できる日数<span>${num('settings.consec',S.settings.consec,'なし')} 日まで</span>
       <small>例：5 → 6日続けての勤務は入れない。空欄なら制限なし。<br>勤務のない日（休み・休日）をはさむと、また1日目から数えます。<br>人ごとに変えるときは「メンバー」→「特別な勤務条件」で。</small></label>
     <label>かけもちする人の「次の勤務までの時間」<span>${sel('settings.intMode',S.settings.intMode,{common:'長い方にそろえる',perPattern:'直前の勤務に合わせる'})}</span>
       <small>勤務のあと次の勤務まで最低あける時間（勤務間インターバル）は、パターンごとに決めています。日勤と夜勤の両方に入る人のように、<b>あける時間が違うパターンをかけもちする人</b>だけに関係する設定です（1つのパターンだけの人は関係ありません）。<br>例：日勤のあとは「0時間」、夜勤のあとは「1日」あける設定のとき<br>・長い方にそろえる → 日勤のあとも1日あける（その日の夜勤にも、翌日の日勤にも入れない）<br>・直前の勤務に合わせる → 日勤のあとは続けて夜勤に入れる。夜勤のあとは1日あける</small></label>
-  </div></section>`+rPatternCsv();
+  </div></details>`+rPatternCsv();
   h+=`<section class="card"><div class="cardhead"><h2>${ico('grid')}勤務パターン設定</h2><button class="primary small" data-act="addPat">＋ パターン追加</button></div>
     <div class="ulist">`;
   S.patterns.forEach((p,pi)=>{
@@ -1359,10 +1364,10 @@ function rPatterns(){
       </div></div></details>`;
   });
   h+=`</div>${S.patterns.length?'':'<p class="hint">まだありません。「＋ パターン追加」から登録してください。</p>'}</section>`+gs+`
-  <section class="card"><h2>休日カレンダー</h2><p class="hint">日本の祝日（振替休日を含む）は自動で入ります。年末年始など、独自の休日を足すと「祝日」と同じ扱いになります。</p>
+  <details class="card csvbox fold" data-fold="hol" ${UI.fold.hol?'open':''}><summary class="csvsum">${ico('cal')}休日カレンダー<span class="fsub">（${esc(mi.label)}の休日：${esc(hl)}）</span></summary><p class="hint">日本の祝日（振替休日を含む）は自動で入ります。年末年始など、独自の休日を足すと「祝日」と同じ扱いになります。</p>
   <div>${S.extraHol.map((x,i)=>`<span class="chip">${esc(x.date)} ${esc(x.name)}<button data-act="delHol" data-i="${i}" title="削除">×</button></span>`).join('')}</div>
   <div class="row"><input type="date" id="holDate"><input type="text" id="holName" placeholder="名前（例：年末年始）"><button data-act="addHol">休日を追加</button></div>
-  <p class="hint">${esc(mi.label)}の休日：${esc(hl)}</p></section>`;
+  <p class="hint">${esc(mi.label)}の休日：${esc(hl)}</p></details>`;
   return h;
 }
 
@@ -2165,6 +2170,7 @@ document.addEventListener('change',e=>{
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&UI.helpOpen){UI.helpOpen=false;render()}});
 document.addEventListener('click',e=>{const l=e.target.closest('.pselect');if(!l)return;const i=l.querySelector('input');if(i&&i.showPicker&&e.target!==i){try{i.showPicker()}catch(x){}}});
 document.addEventListener('toggle',e=>{if(e.target&&e.target.id==='gfbox'){UI.gopen=e.target.open;return}});
+document.addEventListener('toggle',e=>{const el=e.target;if(el&&el.dataset&&el.dataset.fold){UI.fold[el.dataset.fold]=el.open;return}},true);
 document.addEventListener('toggle',e=>{const el=e.target;if(!el.matches||!el.matches('details.ucard'))return;const set=el.dataset.pid?UI.openP:UI.openU,id=el.dataset.pid||el.dataset.uid;
   if(el.open)set.add(id);else set.delete(id);const t=el.querySelector('.tog');if(t)t.textContent=el.open?'閉じる':''},true);
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&UI.teamOpen){UI.teamOpen=false;render()}});
@@ -2207,7 +2213,7 @@ document.addEventListener('click',e=>{
     teamDel(){if(!deleteTeam(D.id))return false},
     exportAll(){exportAllTeams();return false},
     bell(){UI.tab='home';UI.drawer=false;save();render();setTimeout(()=>{const el=$('#noticeCard');if(el)el.scrollIntoView({behavior:'smooth',block:'center'})},30);return false},
-    goSettings(){UI.tab='pat';UI.drawer=false;save();render();setTimeout(()=>{const el=$('#globalSettings');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},30);return false},
+    goSettings(){UI.tab='pat';UI.drawer=false;UI.fold.gs=true;save();render();setTimeout(()=>{const el=$('#globalSettings');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},30);return false},
     goPat(){const pi=D.pi;const pp=S.patterns[pi];if(pp){UI.openP.add(pp.id);render()}setTimeout(()=>{const el=$('#pat-'+pi);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},30);return false},
     gCopyCode(){copyText(gasCode());return false},
     gCopyUrl(){const g=S.gforms[S.month];if(g)copyText(g.url);return false},
