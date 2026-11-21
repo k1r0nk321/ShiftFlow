@@ -2004,6 +2004,7 @@ function rGform(){
   h+=`<h3>A. かんたん連携（ボタンでフォーム作成・回答の取り込み）</h3>`;
   if(!g.url){
     h+=`<p class="hint">最初に1回だけ、あなたのGoogleアカウントに連携用のスクリプトを置きます（5分ほど）。</p>
+    <div class="box warn" style="margin:6px 0 10px"><b>スクリプトの設定はパソコンで行ってください。</b>スマホのスクリプト編集画面では、貼り付けがうまくできません（一度設定すれば、フォームの作成や取り込みはスマホからでもできます）。スマホだけで使うときは、下の「B. 回答を貼り付けて取り込む」を使ってください。</div>
     <ol class="steps">
       <li>下の「連携用スクリプトをコピー」を押します。<br><button class="small" data-act="gCopyCode">連携用スクリプトをコピー</button></li>
       <li><b>script.google.com</b> を開き、「新しいプロジェクト」を押します。最初から書かれている文字を全部消して貼り付け、保存（💾）します。</li>
@@ -2022,7 +2023,14 @@ function rGform(){
       <div class="row"><button class="primary" data-act="gFetch" ${UI.gbusy?'disabled':''}>回答を取り込む</button><button class="small danger" data-act="gForget">このフォームの登録を外す</button></div></div>`;
   }
   h+=`<h3>B. 回答を貼り付けて取り込む（設定なし）</h3>
-    <p class="hint">フォームの「回答」→「スプレッドシートにリンク」で開いた表を、<b>見出しの行も含めて</b>選んでコピーし、下に貼り付けます。CSVファイル（ダウンロードしたもの）も使えます。</p>
+    <p class="hint">フォームの「回答」→「スプレッドシートにリンク」で開いた表を、<b>見出しの行も含めて</b>選んでコピーし、下に貼り付けます。CSVファイル（ダウンロードしたもの）も使えます。<b>スマホだけでも使えます。</b></p>
+    <details><summary>スマホだけで使うときの手順（フォームを自分で作る）</summary><ol class="steps">
+      <li>Googleフォーム（forms.google.com）で新しいフォームを作り、質問を3つ作ります。<br>・「<b>お名前</b>」（記述式。このアプリのメンバー名と同じ名前で書いてもらう）<br>・「<b>勤務希望日</b>」「<b>休み希望日</b>」（記述式。例：<b>12/3, 12/10</b>。「12月3日」の書き方でも読めます）<br>必要なら「備考」も。見出しにこの言葉が入っていれば、取り込めます。</li>
+      <li>右上の「送信」からリンクをコピーして、メンバーに送ります（LINE・メールなど）。</li>
+      <li>回答が集まったら、フォームの「回答」→「スプレッドシートで表示」（Googleスプレッドシートのアプリで開く）。</li>
+      <li>表の左上の角（Aと1の間）を押して全体を選び、「コピー」を押します。</li>
+      <li>このアプリに戻り、下の欄に貼り付けて「貼り付けた内容を確認」を押します。</li>
+    </ol></details>
     <textarea id="gpaste" rows="4" style="width:100%;font-size:13px" placeholder="ここに貼り付け（タイムスタンプ／お名前／勤務希望日／休み希望日 …）"></textarea>
     <div class="row" style="margin-top:6px"><button class="primary small" data-act="gPaste">貼り付けた内容を確認</button><button class="small" data-act="gCsv">CSVファイルを選ぶ</button></div>`;
   if(UI.gerr)h+=`<div class="box err" style="margin-top:10px">${esc(UI.gerr)}</div>`;
