@@ -2301,7 +2301,7 @@ document.addEventListener('click',e=>{
       if(UI.mode==='O'&&E.maxOD!=null){const mi=monthInfo();if(odHit(E,mi,d)&&odCount(E,mi,Object.keys(w).filter(k=>w[k]==='O').map(Number))>=E.maxOD){toast(`${odLabel(E)}の休み希望は${E.maxOD}日までです`);return false}}
       if(UI.mode==='W'){const P=buildProblem(),k=P.U.findIndex(x=>x.id===u.id);if(!P.inst.some((x,i)=>x.d===+d&&k>=0&&P.base[i][k])){toast('この日はこの人が入れる勤務がありません');return false}}
       setWish(u.id,d,UI.mode)},
-    solve(){UI.busy=true;render();setTimeout(()=>{let res;try{res=solveAll(UI.budget);track('solve',{ok:!!res.ok,members:S.users.length,patterns:S.patterns.length})}catch(x){console.error(x);res={month:S.month,created:new Date().toLocaleString('ja-JP'),pre:true,ok:false,errors:['計算中にエラーが起きました：'+x.message]}}
+    solve(){UI.busy=true;render();setTimeout(()=>{let res;try{res=solveAll(UI.budget);track('solve',{ok:!!res.ok,members:S.users.length})}catch(x){console.error(x);res={month:S.month,created:new Date().toLocaleString('ja-JP'),pre:true,ok:false,errors:['計算中にエラーが起きました：'+x.message]}}
       S.results[S.month]=res;save();UI.busy=false;if(!res.pre)UI.tab='chk';render();window.scrollTo(0,0)},60);return false},
     csv(){csvOut(D.m);return false},
     histPick(){UI.hist=D.m},
