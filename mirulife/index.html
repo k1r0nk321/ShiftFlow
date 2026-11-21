@@ -1509,6 +1509,7 @@ const RCOL=[ // [保存する列名, 読み込みで受け付ける見出し]
   ['月の上限',['月の上限','月間上限','月間勤務回数の上限','上限']],
   ['勤務希望の上限',['勤務希望の上限','勤務希望上限']],
   ['休み希望の上限',['休み希望の上限','休み希望上限']],
+  ['曜日を決めた休み希望の上限',['曜日を決めた休み希望の上限','曜日別の休み希望の上限','土日祝の休み希望の上限','曜日の休み希望の上限']],
   ['インターバル',['インターバル','勤務間インターバル']],
   ['勤務できない曜日',['勤務できない曜日','不可曜日']],
   ['勤務できない時間',['勤務できない時間','不可時間']],
@@ -1566,7 +1567,7 @@ function ngToText(r){
 }
 function rosterRows(){ // 今の名簿を表に
   return S.users.map(u=>{const sp=u.sp;
-    return[u.name,S.patterns.filter(p=>u.pats.includes(p.id)).map(p=>p.name).join('／'),sp.max??'',sp.maxW??'',sp.maxO??'',
+    return[u.name,S.patterns.filter(p=>u.pats.includes(p.id)).map(p=>p.name).join('／'),sp.max??'',sp.maxW??'',sp.maxO??'',sp.maxOD??'',
       isNum(sp.intD)||isNum(sp.intH)?`${sp.intD||0}日${sp.intH||0}時間`:'','',sp.ng.map(ngToText).join('；'),
       typeof sp.offPrev==='boolean'?(sp.offPrev?'入れない':'入れてよい'):'',
       sp.consecMax??'',wkText(sp),
@@ -1580,9 +1581,9 @@ function rosterTemplate(){
   const pn=S.patterns.map(p=>p.name);const a=pn[0]||'パターン名',b=pn[1]||a;
   const sl=(S.patterns[0]&&S.patterns[0].slots[0]&&S.patterns[0].slots[0].name)||'時間帯名';
   return[RCOL.map(c=>c[0]),
-    ['田中 一郎',pn.length>1?a+'／'+b:a,'','','','','','','','','2-3',pn.length>1?`${a} 60%／${b} 40%`:'','','','佐藤 花子と同じか多く（差1回まで）'],
-    ['佐藤 花子',a,'6','','','','水','月 祝翌 終日（できれば）','','3','2','','火木 70%',`${sl}=2`,''],
-    ['鈴木 次郎',b,'','2','','1日0時間','','平日 18:00-08:00；祝 終日','入れない','','3','','','','他の全員より多く']];
+    ['田中 一郎',pn.length>1?a+'／'+b:a,'','','','','','','','','','2-3',pn.length>1?`${a} 60%／${b} 40%`:'','','','佐藤 花子と同じか多く（差1回まで）'],
+    ['佐藤 花子',a,'6','','','1','','水','月 祝翌 終日（できれば）','','3','2','','火木 70%',`${sl}=2`,''],
+    ['鈴木 次郎',b,'','2','','','1日0時間','','平日 18:00-08:00；祝 終日','入れない','','3','','','','他の全員より多く']];
 }
 function rosterPreview(text){
   const rows=parseCSV(text);if(rows.length<2)return{err:'見出しの行と、1人分以上のデータが必要です。'};
@@ -1602,7 +1603,7 @@ function rosterPreview(text){
       it.set.pats=[];names.forEach(n=>{if(pmap[n])it.set.pats.push(pmap[n]);else it.warn.push(`パターン「${n}」が見つかりません（先に① シフトパターンで登録してください）`)})}
     const numCol=(k,f)=>{const v=g(k);if(v===undefined)return;if(v===''){it.set[f]=null;return}
       const n=Number(v.replace(/[回日]/g,''));if(isFinite(n)&&n>=0)it.set[f]=Math.floor(n);else it.warn.push(`${k}「${v}」が数字ではありません`)};
-    numCol('月の上限','max');numCol('勤務希望の上限','maxW');numCol('休み希望の上限','maxO');
+    numCol('月の上限','max');numCol('勤務希望の上限','maxW');numCol('休み希望の上限','maxO');numCol('曜日を決めた休み希望の上限','maxOD');
     if(g('インターバル')!==undefined){const iv=parseInterval(g('インターバル'));if(iv.err)it.warn.push(iv.err);else{it.set.intD=iv.intD;it.set.intH=iv.intH}}
     if(g('勤務できない曜日')!==undefined||g('勤務できない時間')!==undefined){
       const ng=[];const dv=g('勤務できない曜日');
@@ -1651,7 +1652,7 @@ function applyRoster(pv){
     let u=S.users.find(x=>x.name.trim()===it.name);
     if(!u){u={id:'u_'+uid(),name:it.name,pats:[],sp:blankSp()};S.users.push(u)}
     const z=it.set;if(z.pats)u.pats=z.pats;
-    ['max','maxW','maxO','intD','intH','offPrev','consecMax','wkMin','wkMax','patShare','prefDays','prefShare','slotMax'].forEach(k=>{if(k in z)u.sp[k]=z[k]});
+    ['max','maxW','maxO','maxOD','intD','intH','offPrev','consecMax','wkMin','wkMax','patShare','prefDays','prefShare','slotMax'].forEach(k=>{if(k in z)u.sp[k]=z[k]});
     if(z.ng)u.sp.ng=z.ng;
   });
   Object.values(last).forEach(it=>{if(!it.set.balance)return;const u=S.users.find(x=>x.name.trim()===it.name);
@@ -1669,6 +1670,7 @@ function rRosterCsv(){
     <tr><td>名前</td><td>必須。この名前で登録済みの人と照合します</td></tr>
     <tr><td>シフトパターン</td><td>① で登録したパターン名。複数は「／」で区切る（例：日勤／夜勤）</td></tr>
     <tr><td>月の上限・勤務希望の上限・休み希望の上限</td><td>数字。空欄＝パターンの設定どおり</td></tr>
+    <tr><td>曜日を決めた休み希望の上限</td><td>数字。パターンで選んだ曜日（例：土日祝）の休み希望を月何日までにするか。空欄＝パターンの設定どおり</td></tr>
     <tr><td>インターバル</td><td>時間の数字（例：12、36）か「1日12時間」。空欄＝パターンの設定どおり</td></tr>
     <tr><td>勤務できない曜日</td><td>その曜日は終日不可。例：水、土日、平日、土日祝</td></tr>
     <tr><td>勤務できない時間</td><td>「曜日 時間」を「；」で区切って複数。例：平日 18:00-08:00；祝 終日。曜日を省くと毎日。「祝翌」＝祝日の翌日。最後に「（できれば）」を付けると「できれば避ける」</td></tr>
@@ -1691,7 +1693,7 @@ function rRosterCsv(){
     ${pv.rows.map(r=>{const z=r.set,v=(k,suf='')=>k in z?(z[k]==null?'—':z[k]+suf):'<span class="hint">変更なし</span>';
       return `<tr><td>${r.line}</td><td class="nm">${esc(r.name)}</td><td>${r.status}</td>
       <td style="text-align:left">${z.pats?esc(z.pats.map(pn).join('／'))||'—':'<span class="hint">変更なし</span>'}</td>
-      <td>${v('max','回')}</td><td>${v('maxW','日')}</td><td>${v('maxO','日')}</td>
+      <td>${v('max','回')}</td><td>${v('maxW','日')}</td><td>${v('maxO','日')}${'maxOD' in z?`<br><small>選んだ曜日 ${z.maxOD==null?'—':z.maxOD+'日'}</small>`:''}</td>
       <td>${'intD' in z?(z.intD==null?'—':`${z.intD}日${z.intH}時間`):'<span class="hint">変更なし</span>'}</td>
       <td style="text-align:left">${z.ng?esc(z.ng.map(ngToText).join('；'))||'—':'<span class="hint">変更なし</span>'}</td>
       <td>${'offPrev' in z?(z.offPrev==null?'全体どおり':z.offPrev?'入れない':'入れてよい'):'<span class="hint">変更なし</span>'}</td>
@@ -1726,6 +1728,7 @@ const PCOL=[
   ['月の上限',['月の上限','月間上限','月間勤務回数の上限']],
   ['勤務希望の上限',['勤務希望の上限']],
   ['休み希望の上限',['休み希望の上限']],
+  ['曜日を決めた休み希望の上限',['曜日を決めた休み希望の上限','曜日別の休み希望の上限','土日祝の休み希望の上限','曜日の休み希望の上限']],
   ['勤務希望の扱い',['勤務希望の扱い']],
   ['休み希望の扱い',['休み希望の扱い']],
   ['時間帯を満遍なく',['時間帯を満遍なく','各メンバーの時間帯','満遍なく']],
@@ -1733,6 +1736,7 @@ const PCOL=[
 const HOLTXT={normal:'曜日どおり',exclude:'祝日は勤務なし',add:'祝日も勤務',only:'祝日だけ'};
 function daysText(d){if(d.every(Boolean))return'毎日';if(d.join()===[false,true,true,true,true,true,false].join())return'平日';return d.map((v,i)=>v?WD[i]:'').join('')}
 function comboText(p){return p.combos.map(c=>p.slots.filter(sl=>(c.counts[sl.id]||0)>0).map(sl=>sl.name+(c.counts[sl.id]>1?'×'+c.counts[sl.id]:'')).join('+')).filter(Boolean).join('／')}
+function odText(p){if(!isNum(p.maxOD))return'';const d=p.offDays||[true,false,false,false,false,false,true];const t=(d.some(Boolean)?daysText(d):'')+(p.offHol!==false?'祝':'');return `${t||'曜日なし'} ${p.maxOD}`}
 function patternRows(){
   const rows=[];
   S.patterns.forEach(p=>p.slots.forEach((sl,k)=>{
@@ -1740,19 +1744,19 @@ function patternRows(){
     rows.push([p.name,sl.name,sl.abbr,sl.start,sl.end,p.mode==='combo'?'':(sl.need??''),daysText(sl.days),HOLTXT[sl.hol]||'曜日どおり',
       head&&p.mode==='combo'?comboText(p):'',
       head?((p.intD||p.intH)?`${p.intD||0}日${p.intH||0}時間`:'0'):'',
-      head?(p.maxM??''):'',head?(p.maxW??''):'',head?(p.maxO??''):'',
+      head?(p.maxM??''):'',head?(p.maxW??''):'',head?(p.maxO??''):'',head?odText(p):'',
       head?(p.hardW?'必ず':'できるだけ'):'',head?(p.hardO?'必ず':'できるだけ'):'',
       head?(p.spread?'する':'しない'):'',head?(p.fair===false?'そろえない':'そろえる'):''])}));
   return rows;
 }
 function patternTemplate(){return[PCOL.map(c=>c[0]),
-  ['早番','早番','早','07:00','16:00','2','毎日','曜日どおり','','0日11時間','','3','5','できるだけ','必ず','しない','そろえる'],
-  ['遅番','遅番','遅','13:00','22:00','2','毎日','曜日どおり','','0日11時間','','3','5','できるだけ','必ず','しない','そろえる'],
-  ['中番','中番','中','10:00','19:00','1','平日','祝日は勤務なし','','0日11時間','','3','5','できるだけ','必ず','しない','そろえる'],
-  ['夜勤','夜勤','夜','22:00','07:00','1','毎日','曜日どおり','','1日0時間','8','2','5','できるだけ','必ず','しない','そろえる'],
-  ['店舗','午前','前','09:00','13:00','','平日','祝日は勤務なし','午前+午後／終日','0','','','','できるだけ','必ず','する','そろえる'],
-  ['店舗','午後','後','13:00','17:00','','平日','祝日は勤務なし','','','','','','','','',''],
-  ['店舗','終日','終','09:00','17:00','','平日','祝日は勤務なし','','','','','','','','','']]}
+  ['早番','早番','早','07:00','16:00','2','毎日','曜日どおり','','0日11時間','','3','5','土日祝 1','できるだけ','必ず','しない','そろえる'],
+  ['遅番','遅番','遅','13:00','22:00','2','毎日','曜日どおり','','0日11時間','','3','5','','できるだけ','必ず','しない','そろえる'],
+  ['中番','中番','中','10:00','19:00','1','平日','祝日は勤務なし','','0日11時間','','3','5','','できるだけ','必ず','しない','そろえる'],
+  ['夜勤','夜勤','夜','22:00','07:00','1','毎日','曜日どおり','','1日0時間','8','2','5','土日祝 1','できるだけ','必ず','しない','そろえる'],
+  ['店舗','午前','前','09:00','13:00','','平日','祝日は勤務なし','午前+午後／終日','0','','','','','できるだけ','必ず','する','そろえる'],
+  ['店舗','午後','後','13:00','17:00','','平日','祝日は勤務なし','','','','','','','','','',''],
+  ['店舗','終日','終','09:00','17:00','','平日','祝日は勤務なし','','','','','','','','','','']]}
 function parseTime(t){t=zen2han(t);const m=/^(\d{1,2})\s*(?::|時)\s*(\d{2})?/.exec(t);if(!m||+m[1]>24)return null;return pad(+m[1]%24)+':'+(m[2]||'00')}
 function patternPreview(text){
   const rows=parseCSV(text);if(rows.length<2)return{err:'見出しの行と、1行以上のデータが必要です。'};
@@ -1782,7 +1786,7 @@ function patternPreview(text){
     G.slots.push(sl);
     // パターン全体の項目：最初に値が書かれた行を使う（列があって全部空欄なら「設定なし」）
     const pv=(k,f)=>{const v=g(k);if(v===undefined)return;if(!(f in G.set))G.set[f]={v:'',line};if(G.set[f].v===''&&v!=='')G.set[f]={v,line}};
-    pv('人数の組み合わせ','combo');pv('インターバル','int');pv('月の上限','maxM');pv('勤務希望の上限','maxW');pv('休み希望の上限','maxO');
+    pv('人数の組み合わせ','combo');pv('インターバル','int');pv('月の上限','maxM');pv('勤務希望の上限','maxW');pv('休み希望の上限','maxO');pv('曜日を決めた休み希望の上限','od');
     pv('勤務希望の扱い','hardW');pv('休み希望の扱い','hardO');pv('時間帯を満遍なく','spread');pv('回数をそろえる','fair');
   });
   if(!groups.length)return{err:'パターン名の入った行がありません。'};
@@ -1796,6 +1800,8 @@ function patternPreview(text){
       if(!bad){z.mode='combo';z.combos=cs}}}
     if(S2.int){const iv=parseInterval(S2.int.v);if(iv.err)G.warn.push(iv.err);else{z.intD=iv.intD??0;z.intH=iv.intH??0}}
     ['maxM','maxW','maxO'].forEach(f=>{if(!S2[f])return;const v=S2[f].v.replace(/[回日]/g,'');if(v===''){z[f]=null;return}if(/^\d+$/.test(v))z[f]=+v;else G.warn.push(`${f==='maxM'?'月の上限':f==='maxW'?'勤務希望の上限':'休み希望の上限'}「${S2[f].v}」が数字ではありません`)});
+    if(S2.od){const v=S2.od.v.trim();if(v===''){z.maxOD=null}else{const mm=/^(.*?)\s*(\d+)\s*[回日]?\s*(?:まで)?$/.exec(v);
+      if(!mm)G.warn.push(`曜日を決めた休み希望の上限「${v}」が読めません（例：土日祝 1）`);else{z.maxOD=+mm[2];const dt=mm[1].trim();if(dt){const d=parseDays(dt);if(d.any){z.offDays=d.days;z.offHol=d.hol}else G.warn.push(`曜日を決めた休み希望の上限「${v}」の曜日が読めません（例：土日祝 1）`)}}}}
     ['hardW','hardO'].forEach(f=>{if(!S2[f]||S2[f].v==='')return;const v=S2[f].v;if(/必ず/.test(v))z[f]=true;else if(/できるだけ|なるべく/.test(v))z[f]=false;else G.warn.push(`${f==='hardW'?'勤務希望':'休み希望'}の扱い「${v}」は「必ず」か「できるだけ」で書いてください`)});
     if(S2.spread&&S2.spread.v!==''){const v=S2.spread.v;if(/しない|いいえ|×/.test(v))z.spread=false;else if(/する|はい|○|満遍なく/.test(v))z.spread=true;else G.warn.push(`時間帯を満遍なく「${v}」は「する」か「しない」で書いてください`)}
     if(S2.fair&&S2.fair.v!==''){const v=S2.fair.v;if(/そろえない|しない|いいえ|×/.test(v))z.fair=false;else if(/そろえる|する|はい|○/.test(v))z.fair=true;else G.warn.push(`回数をそろえる「${v}」は「そろえる」か「そろえない」で書いてください`)}
@@ -1809,12 +1815,12 @@ function patternPreview(text){
 function applyPatterns(pv){
   pv.groups.forEach(G=>{
     let p=G.ex;
-    if(!p){p={id:'p_'+uid(),name:G.label,slots:[],intD:0,intH:0,maxM:null,maxW:null,maxO:null,hardW:false,hardO:true,mode:'fixed',combos:[],fair:true,spread:false};S.patterns.push(p)}
+    if(!p){p={id:'p_'+uid(),name:G.label,slots:[],intD:0,intH:0,maxM:null,maxW:null,maxO:null,maxOD:null,offDays:[true,false,false,false,false,false,true],offHol:true,hardW:false,hardO:true,mode:'fixed',combos:[],fair:true,spread:false};S.patterns.push(p)}
     p.slots=G.slots.map(x=>{const ex=G.ex&&G.ex.slots.find(s=>nz(s.name)===nz(x.name));
       const sl=ex?Object.assign({},ex,{days:ex.days.slice()}):{id:uid(),name:x.name,abbr:x.name.slice(0,2),start:'08:30',end:'17:15',need:1,days:[false,true,true,true,true,true,false],hol:'exclude'};
       sl.name=x.name;Object.assign(sl,x.set);return sl});
     const z=G.z;
-    ['intD','intH','maxM','maxW','maxO','hardW','hardO','spread','fair','mode'].forEach(k=>{if(k in z)p[k]=z[k]});
+    ['intD','intH','maxM','maxW','maxO','maxOD','offDays','offHol','hardW','hardO','spread','fair','mode'].forEach(k=>{if(k in z)p[k]=z[k]});
     if(z.combos)p.combos=z.combos.map(c=>{const counts={};Object.entries(c).forEach(([n,v])=>{const sl=p.slots.find(s=>nz(s.name)===nz(n));if(sl)counts[sl.id]=v});return{id:uid(),counts}});
     else if(p.mode==='combo'){const ids=new Set(p.slots.map(s=>s.id));p.combos.forEach(c=>Object.keys(c.counts).forEach(id=>{if(!ids.has(id))delete c.counts[id]}))}
   });
@@ -1838,6 +1844,7 @@ function rPatternCsv(){
     <tr><td>人数の組み合わせ</td><td>毎日どれか1つを選ぶ組み合わせを「／」で区切る。時間帯は「+」でつなぎ、2人以上は「×2」。例：1／2+5</td></tr>
     <tr><td>インターバル</td><td>時間の数字か「1日12時間」</td></tr>
     <tr><td>月の上限・勤務希望の上限・休み希望の上限</td><td>数字（1人あたり）。空欄＝制限なし</td></tr>
+    <tr><td>曜日を決めた休み希望の上限</td><td>「曜日 日数」。例：土日祝 1（土日と祝日の休み希望は月1日まで）、金 1。日数だけなら曜日は今の設定のまま。空欄＝制限なし</td></tr>
     <tr><td>勤務希望の扱い・休み希望の扱い</td><td>必ず／できるだけ</td></tr>
     <tr><td>時間帯を満遍なく</td><td>する／しない</td></tr>
     <tr><td>回数をそろえる</td><td>そろえる／そろえない</td></tr>
@@ -1845,7 +1852,7 @@ function rPatternCsv(){
   if(pv&&pv.err)h+=`<div class="box err" style="margin-top:12px">${esc(pv.err)}</div>`;
   if(pv&&pv.groups){
     const zt=z=>[z.mode==='combo'?'組み合わせ '+z.combos.map(c=>Object.entries(c).map(([n,v])=>n+(v>1?'×'+v:'')).join('+')).join('／'):z.mode==='fixed'?'人数は固定':'',
-      'intD' in z?`インターバル ${z.intD}日${z.intH}時間`:'', 'maxM' in z?`月の上限 ${z.maxM??'なし'}`:'', 'maxW' in z?`勤務希望 ${z.maxW??'なし'}`:'', 'maxO' in z?`休み希望 ${z.maxO??'なし'}`:'',
+      'intD' in z?`インターバル ${z.intD}日${z.intH}時間`:'', 'maxM' in z?`月の上限 ${z.maxM??'なし'}`:'', 'maxW' in z?`勤務希望 ${z.maxW??'なし'}`:'', 'maxO' in z?`休み希望 ${z.maxO??'なし'}`:'', 'maxOD' in z?`曜日を決めた休み希望 ${z.maxOD==null?'なし':odText({maxOD:z.maxOD,offDays:z.offDays||(G.ex&&G.ex.offDays),offHol:'offHol' in z?z.offHol:(G.ex?G.ex.offHol:true)})}`:'',
       'hardW' in z?`勤務希望は${z.hardW?'必ず':'できるだけ'}`:'', 'hardO' in z?`休み希望は${z.hardO?'必ず':'できるだけ'}`:'',
       'spread' in z?`満遍なく${z.spread?'する':'しない'}`:'', 'fair' in z?(z.fair?'回数をそろえる':'回数はそろえない'):''].filter(Boolean).join(' / ');
     h+=`<h3>読み込む内容の確認（${pv.groups.length}パターン：新規${pv.groups.filter(g=>g.status==='新規').length}・更新${pv.groups.filter(g=>g.status==='更新').length}）</h3>
