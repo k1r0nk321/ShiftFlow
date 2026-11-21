@@ -1354,7 +1354,7 @@ function condText(u){
   return t.join('・')||'—';
 }
 function rUsers(){
-  let h=`<div class="lead">メンバー（名前）を登録し、入るシフトパターンを選びます（複数選べます）。<br>一覧の行を押すと、その人の設定が開きます。空欄の項目はパターンの設定どおりになります。</div>`;
+  let h=`<div class="lead">メンバー（名前）を登録し、入るシフトパターンを選びます（複数選べます）。<br>名前を押すと、その人の設定が開きます。空欄の項目はパターンの設定どおりになります。</div>`;
   h+=`<section class="card"><div class="cardhead"><h2>${ico('users')}メンバー一覧</h2><button class="primary small" data-act="addUser">＋ メンバー追加</button></div>
     <div class="ulist">`;
   S.users.forEach((u,ui)=>{
@@ -1362,7 +1362,7 @@ function rUsers(){
     const lim=v=>v==null?'制限なし':v+'日まで';
     const open=UI.openU.has(u.id);
     const ct=condText(u);
-    h+=`<details class="ucard" data-uid="${u.id}" ${open?'open':''}><summary class="usum">${avatar(u.name)}<b>${esc(u.name||'(名前なし)')}</b><span class="chipsP">${S.patterns.map((p,pi)=>u.pats.includes(p.id)?pcodeBadge(pi):'').join('')||'<span class="hint">パターン未選択</span>'}</span>${ct!=='—'?`<span class="ucond">${esc(ct)}</span>`:''}<span class="tog">${open?'閉じる':'設定を開く'}</span></summary><div class="ubody">
+    h+=`<details class="ucard" data-uid="${u.id}" ${open?'open':''}><summary class="usum">${avatar(u.name)}<b>${esc(u.name||'(名前なし)')}</b><span class="chipsP">${S.patterns.map((p,pi)=>u.pats.includes(p.id)?pcodeBadge(pi):'').join('')||'<span class="hint">パターン未選択</span>'}</span>${ct!=='—'?`<span class="ucond">${esc(ct)}</span>`:''}<span class="tog">${open?'閉じる':''}</span></summary><div class="ubody">
     <div class="cardhead"><input type="text" class="title" style="width:220px" data-path="users.${ui}.name" value="${esc(u.name)}" placeholder="名前">
       <button class="danger small" data-act="delUser" data-ui="${ui}">削除</button></div>
       <div class="hint" style="margin-top:8px">入るシフトパターン</div>
@@ -2135,7 +2135,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&(UI.helpOpen||UI.fb
 document.addEventListener('click',e=>{const l=e.target.closest('.pselect');if(!l)return;const i=l.querySelector('input');if(i&&i.showPicker&&e.target!==i){try{i.showPicker()}catch(x){}}});
 document.addEventListener('toggle',e=>{if(e.target&&e.target.id==='gfbox'){UI.gopen=e.target.open;return}});
 document.addEventListener('toggle',e=>{const el=e.target;if(!el.matches||!el.matches('details.ucard'))return;const id=el.dataset.uid;
-  if(el.open)UI.openU.add(id);else UI.openU.delete(id);const t=el.querySelector('.tog');if(t)t.textContent=el.open?'閉じる':'設定を開く'},true);
+  if(el.open)UI.openU.add(id);else UI.openU.delete(id);const t=el.querySelector('.tog');if(t)t.textContent=el.open?'閉じる':''},true);
 document.addEventListener('click',e=>{
   const t=e.target.closest('[data-tab]');if(t){UI.drawer=false;UI.helpOpen=false;UI.fbOpen=false;UI.tab=t.dataset.tab;render();window.scrollTo(0,0);return}
   const b=e.target.closest('[data-act]');if(!b)return;
