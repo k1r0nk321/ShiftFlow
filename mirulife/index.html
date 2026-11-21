@@ -698,7 +698,7 @@ function fbPanel(){
       <label class="fbl">種類<select id="fbKind">${FB_KINDS.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label>
       <label class="fbl">内容<textarea id="fbText" rows="6" maxlength="2000" placeholder="例：夜勤の回数を人ごとに週単位でも決めたい" style="width:100%;font:inherit"></textarea></label>
       <label class="fbl">返信用のメールアドレス（任意）<input id="fbMail" type="email" maxlength="200" placeholder="返信が必要なときだけ"></label>
-      <p class="hint">送られるのは、この欄に書いた内容と、開いていた画面の名前・端末の種類だけです。作成中の勤務表やメンバーの名前は送られません。<b>患者さんや職員の個人情報は書かないでください。</b></p>
+      <p class="hint">送られるのは、この欄に書いた内容と、開いていた画面の名前・端末の種類だけです。作成中の勤務表やメンバーの名前は送られません。<b>患者さんや職員の個人情報は書かないでください。</b>（<a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>）</p>
       <p id="fbErr" class="hint" style="color:#c0392b;display:none"></p>
       <div class="row" style="justify-content:flex-end;gap:8px;margin-top:6px"><button type="button" class="outline" data-act="fbClose">やめる</button><button type="button" class="primary" data-act="fbSend" ${UI.fbBusy?'disabled':''}>${UI.fbBusy?'送信中…':'送信する'}</button></div>
     </form>`;
@@ -2191,7 +2191,7 @@ function rData(){
   <section class="card" id="tplCard"><h2>${ico('grid')}見本から始める</h2><p class="hint">職場に近い見本を選ぶと、勤務パターン・メンバー・条件がまとめて入ります。名前や人数を直して使ってください。<b>今の内容は置き換わります</b>（残したい場合は先に上の「ファイルに書き出す」で保存）。</p>${rTemplates()}</section>
   <section class="card"><h2>最初からやり直す</h2><div class="row">
     <button class="danger" data-act="reset">${TM.list.length>1?'このチームを空にする':'すべて消して空にする'}</button></div></section>
-  <section class="card"><h2>このアプリについて</h2><p class="hint">Mirulife Shift の名簿・勤務表のデータは、この端末の中だけに保存され、外部には送られません（Googleフォーム連携を使うときを除く）。サービス改善のため、Cookie を使わないアクセス解析で、画面の表示や「勤務表を作成した」といった操作の回数だけを数えています。勤務表は「焼きなまし法」という最適化の計算で作っています（生成AIは使っていません）。前の期間の勤務表がこのアプリにあれば、期間の始めのインターバル・連勤にその勤務を考慮します。<br><a href="about.html" target="_blank" rel="noopener">紹介ページを見る</a></p><p><button class="small outline" data-act="fbOpen">${ico('chat')}ご意見・ご要望を送る</button></p></section>`;
+  <section class="card"><h2>このアプリについて</h2><p class="hint">Mirulife Shift の名簿・勤務表のデータは、この端末の中だけに保存され、外部には送られません（Googleフォーム連携を使うときを除く）。サービス改善のため、Cookie を使わないアクセス解析で、画面の表示や「勤務表を作成した」といった操作の回数だけを数えています。勤務表は「焼きなまし法」という最適化の計算で作っています（生成AIは使っていません）。前の期間の勤務表がこのアプリにあれば、期間の始めのインターバル・連勤にその勤務を考慮します。<br><a href="about.html" target="_blank" rel="noopener">紹介ページを見る</a></p><p><button class="small outline" data-act="fbOpen">${ico('chat')}ご意見・ご要望を送る</button></p><p class="hint"><a href="terms.html" target="_blank" rel="noopener">利用規約</a>　<a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>　「Mirulife」は商標出願中です。</p></section>`;
 }
 
 /* ---------- 操作 ---------- */
