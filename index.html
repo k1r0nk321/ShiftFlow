@@ -272,6 +272,7 @@ details.ucard .ubody{padding:12px 16px 16px}
   .period{flex-wrap:wrap}.period .pl{display:none}
   #plabel{display:block;width:100%;font-size:11px;padding:0 4px 2px}
   .stats>.stat:last-child:nth-child(odd){grid-column:1/-1}
+  body.kb #bnav{display:none}
   #bnav{display:flex;position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:0 0 env(safe-area-inset-bottom);z-index:30}
   #bnav button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 2px 8px;font-size:11px;color:var(--sub);border-radius:0;min-height:56px}
   #bnav button svg{width:22px;height:22px}
@@ -2168,6 +2169,27 @@ document.addEventListener('click',e=>{
   if(A[a]()===false)return;
   save();render();
 });
+/* iPhone の Safari：キーボードを閉じたあと、下のメニューが画面の途中に残ることがあるための対策
+   （入力中はメニューを隠し、入力が終わったら位置を置き直す） */
+(function(){
+  const vv=window.visualViewport;
+  const typing=el=>!!el&&(el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&!/^(checkbox|radio|button|submit|reset|range|color|file|image)$/i.test(el.type||'')));
+  let t=0;
+  function settle(){
+    const kb=typing(document.activeElement)||(!!vv&&vv.height<window.innerHeight*0.72);
+    document.body.classList.toggle('kb',kb);
+    if(kb)return;
+    const n=document.getElementById('bnav');if(!n)return;
+    n.style.display='none';void n.offsetHeight;n.style.display='';   // 置き直し
+    window.scrollTo(window.scrollX,window.scrollY);
+  }
+  const later=d=>{clearTimeout(t);t=setTimeout(settle,d)};
+  document.addEventListener('focusin',e=>{if(typing(e.target))document.body.classList.add('kb')});
+  document.addEventListener('focusout',()=>later(120));
+  document.addEventListener('change',e=>{if(e.target&&e.target.tagName==='SELECT')later(120)});
+  if(vv)vv.addEventListener('resize',()=>later(80));
+  window.addEventListener('orientationchange',()=>later(300));
+})();
 render();
 (function(){const q=new URLSearchParams(location.search).get('template');if(!q)return;history.replaceState(null,'',location.pathname);setTimeout(()=>loadTemplate(q,!FRESH),50)})();
 </script>
