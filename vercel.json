@@ -1,0 +1,6 @@
+{
+  "redirects": [
+    { "source": "/mirulife", "destination": "https://shift.mirulife.jp/", "permanent": false },
+    { "source": "/mirulife/:path*", "destination": "https://shift.mirulife.jp/:path*", "permanent": false }
+  ]
+}
