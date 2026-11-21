@@ -585,6 +585,7 @@ function tplBuild(t){
   const balance=(t.balance||[]).map(([a,b,rel,diff])=>({id:uid(),a:U(a).id,b:b==='*'?'*':U(b).id,rel,diff:diff??null}));
   return migrate({v:1,month:nextMonth(),settings:Object.assign(defSettings(),t.settings||{},{facility:t.facility||''}),patterns:pats,users,wishD:{},extraHol:[],results:{},balance});
 }
+const REL_TXT={ge:'と同じか多く',gt:'より多く',le:'と同じか少なく',lt:'より少なく'};
 const NAMES=['青木','石井','上田','遠藤','大野','加藤','菊地','工藤','小林','斉藤','佐々木','清水','鈴木','高田','田村','中島','西村','野口','橋本','藤田'];
 const TEMPLATES=[
  {k:'general',title:'一般：日勤・夜勤',desc:'どの職場にも。日勤（毎日2人）と夜勤（毎日1人）。8人',build:()=>sampleState()},
@@ -867,7 +868,7 @@ function buildProblem(){
   const uix={};U.forEach((E,k)=>uix[E.id]=k);
   const bal=(S.balance||[]).map(r=>{const a=uix[r.a];if(a==null)return null;
     const bs=r.b==='*'?U.map((E,k)=>k).filter(k=>k!==a):(uix[r.b]!=null&&uix[r.b]!==a?[uix[r.b]]:[]);
-    return bs.length?{a,bs,rel:r.rel==='gt'?'gt':'ge',diff:isNum(r.diff)?r.diff:null}:null}).filter(Boolean);
+    return bs.length?{a,bs,rel:REL_TXT[r.rel]?r.rel:'ge',diff:isNum(r.diff)?r.diff:null}:null}).filter(Boolean);
   return{mi,inst,U,can,base,avoid,cand,bal,excl,errors,byPat,groupP,groupS,nP:S.patterns.length,nS:slots.length,slots,prevInfo,groups,week,nW,groupAll};
 }
 /* 休み希望に当たる日（当たらなければ0）。offPrev のときは、休み希望日の前日に始まり当日にかかる勤務も当たる */
@@ -924,7 +925,9 @@ function makeSolver(P){
     for(let s=0;s<nS;s++){const G=P.groupS[s];if(G.length<2)continue;f+=W_FAIRSL*sq(G,cS,s)}
     return f}
   function hardSum(){let h=unfilled;for(let u=0;u<nU;u++)h+=uh[u];return h}
-  function balDev(r,b){const ca=uL[r.a].length,cb=uL[b].length;let d=Math.max(0,(r.rel==='gt'?cb+1:cb)-ca);if(r.diff!=null)d+=Math.max(0,ca-cb-r.diff);return d}
+  function balDev(r,b){const ca=uL[r.a].length,cb=uL[b].length;
+    if(r.rel==='le'||r.rel==='lt'){let d=Math.max(0,ca-(r.rel==='lt'?cb-1:cb));if(r.diff!=null)d+=Math.max(0,cb-ca-r.diff);return d}
+    let d=Math.max(0,(r.rel==='gt'?cb+1:cb)-ca);if(r.diff!=null)d+=Math.max(0,ca-cb-r.diff);return d}
   function balance(){let p=0;for(const r of P.bal)for(const b of r.bs)p+=balDev(r,b);return p*W_BAL}
   function total(){let h=unfilled,s=0;for(let u=0;u<nU;u++){h+=uh[u];s+=us[u]}return h*WH+s+fair()+balance()}
   function setPos(i,k,u){const old=asg[i][k];if(old===u)return old;
@@ -1030,7 +1033,7 @@ function makeSolver(P){
       if(brO.length)soft.push(`${E.name}さん：休み希望 ${brO.map(d=>fd(mi,d)).join('、')} に勤務${E.offPrev?'（前日からの夜勤を含む）':''}が入っています`);
     });
     for(const r of P.bal)for(const b of r.bs)if(balDev(r,b)){const ca=uL[r.a].length,cb=uL[b].length;
-      soft.push(`回数のバランス：${U[r.a].name}さん（${ca}回）を${U[b].name}さん（${cb}回）${r.rel==='gt'?'より多く':'と同じか多く'}${r.diff!=null?`（差は${r.diff}回まで）`:''}する目安が守れませんでした`)}
+      soft.push(`回数のバランス：${U[r.a].name}さん（${ca}回）を${U[b].name}さん（${cb}回）${REL_TXT[r.rel]||REL_TXT.ge}${r.diff!=null?`（差は${r.diff}回まで）`:''}する目安が守れませんでした`)}
     return{viol,soft,hard:hardSum()};
   }
   return{greedy,anneal,loadAsg,report,best:()=>best,asg,req};
@@ -1338,10 +1341,10 @@ function rUsers(){
   h+=`<p><button class="primary" data-act="addUser">＋ メンバーを追加</button></p>`;
   const uo={};S.users.forEach(u=>uo[u.id]=u.name||'(名前なし)');const uo2=Object.assign({},uo,{'*':'他の全員'});
   h+=`<section class="card"><h2>メンバー間の回数のバランス</h2>
-    <p class="hint">人と人の勤務回数（月の合計）の関係を決めます。できるだけ守ります（守れないときは結果に表示）。<br>例：「DDさんをEEさんと同じか多く・差は1回まで」＝ほぼ同じで、違うときはDDさんが多い。「FFさんを他の全員より多く」</p>
+    <p class="hint">人と人の勤務回数（月の合計）の関係を決めます。できるだけ守ります（守れないときは結果に表示）。<br>例：「DDさんをEEさんと同じか多く・差は1回まで」＝ほぼ同じで、違うときはDDさんが多い。「FFさんを他の全員より多く」「GGさんをHHさんより少なく」</p>
     ${S.balance.length?`<div class="tablewrap"><table class="edit stack">${S.balance.map((r,i)=>`<tr>
       <td data-label="">${sel(`balance.${i}.a`,r.a,uo)} さんの回数を</td><td data-label="">${sel(`balance.${i}.b`,r.b,uo2)}</td>
-      <td data-label="">${sel(`balance.${i}.rel`,r.rel,{ge:'と同じか多くする',gt:'より多くする'})}</td>
+      <td data-label="">${sel(`balance.${i}.rel`,r.rel,{ge:'と同じか多くする',gt:'より多くする',le:'と同じか少なくする',lt:'より少なくする'})}</td>
       <td data-label="">差は ${num(`balance.${i}.diff`,r.diff,'なし')} 回まで</td>
       <td class="del"><button class="small danger" data-act="delBal" data-i="${i}">削除</button></td></tr>`).join('')}</table></div>`:'<p class="hint">なし</p>'}
     <button class="small" data-act="addBal" ${S.users.length<2?'disabled':''}>＋ ルールを追加</button></section>`;
@@ -1369,7 +1372,7 @@ const nz=t=>zen2han(t).replace(/\s/g,'');
 const splitList=t=>zen2han(t).split(/[\/／;；\n]/).map(x=>x.trim()).filter(Boolean);
 function wkText(sp){const a=sp.wkMin,b=sp.wkMax;if(!isNum(a)&&!isNum(b))return'';if(isNum(a)&&isNum(b))return a===b?String(a):`${a}-${b}`;return isNum(a)?`${a}以上`:`${b}まで`}
 function balText(u){const nm=id=>id==='*'?'他の全員':((S.users.find(x=>x.id===id)||{}).name||'?');
-  return (S.balance||[]).filter(r=>r.a===u.id).map(r=>`${nm(r.b)}${r.rel==='gt'?'より多く':'と同じか多く'}${isNum(r.diff)?`（差${r.diff}回まで）`:''}`).join('；')}
+  return (S.balance||[]).filter(r=>r.a===u.id).map(r=>`${nm(r.b)}${REL_TXT[r.rel]||REL_TXT.ge}${isNum(r.diff)?`（差${r.diff}回まで）`:''}`).join('；')}
 const zen2han=t=>String(t??'').replace(/[０-９Ａ-Ｚａ-ｚ：－]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[〜～―‐−]/g,'-').replace(/　/g,' ').trim();
 function parseCSV(text){
   text=text.replace(/^﻿/,'');
@@ -1480,11 +1483,11 @@ function rosterPreview(text){
         if(hits.length===1)o[hits[0].id]=+m[2];else{bad=true;it.warn.push(hits.length>1?`時間帯「${m[1]}」が複数のパターンにあります`:`時間帯ごとの上限「${e}」が読めません（この人のパターンの時間帯名＝回数。例：2=2）`)}});
       if(!bad)it.set.slotMax=o}
     if(g('回数のバランス')!==undefined){const rs=[];
-      splitList(g('回数のバランス')).forEach(e=>{const m=/^(.+?)(と同じか多く|以上|より多く)(?:する)?\s*(?:[（(]\s*差は?\s*(\d+)\s*回?まで\s*[)）])?$/.exec(e);
-        if(!m){it.warn.push(`回数のバランス「${e}」が読めません（例：EEと同じか多く（差1回まで）、他の全員より多く）`);return}
+      splitList(g('回数のバランス')).forEach(e=>{const m=/^(.+?)(と同じか多く|以上|より多く|と同じか少なく|以下|より少なく)(?:する)?\s*(?:[（(]\s*差は?\s*(\d+)\s*回?まで\s*[)）])?$/.exec(e);
+        if(!m){it.warn.push(`回数のバランス「${e}」が読めません（例：EEと同じか多く（差1回まで）、他の全員より多く、EEより少なく）`);return}
         const b=/^(他の)?全員$/.test(m[1].trim())?'*':m[1].trim();
         if(b!=='*'&&!S.users.some(u=>u.name.trim()===b)&&!rows.slice(1).some(r=>String(r[col['名前']]??'').trim()===b)){it.warn.push(`回数のバランス：「${b}」さんが名簿にいません`);return}
-        rs.push({b,rel:m[2]==='より多く'?'gt':'ge',diff:m[3]!=null?+m[3]:null})});
+        rs.push({b,rel:{'より多く':'gt','と同じか少なく':'le','以下':'le','より少なく':'lt'}[m[2]]||'ge',diff:m[3]!=null?+m[3]:null})});
       it.set.balance=rs}
     out.push(it);
   });
@@ -1524,7 +1527,7 @@ function rRosterCsv(){
     <tr><td>パターンの割合</td><td>例：日勤 60%／夜勤 40%</td></tr>
     <tr><td>優先する曜日</td><td>例：火木 70%</td></tr>
     <tr><td>時間帯ごとの上限</td><td>月の上限。「時間帯名=回数」を「／」で区切る。0＝入らない。例：2=2／5=0</td></tr>
-    <tr><td>回数のバランス</td><td>例：EEと同じか多く（差1回まで）、他の全員より多く。複数は「；」で区切る</td></tr>
+    <tr><td>回数のバランス</td><td>例：EEと同じか多く（差1回まで）、他の全員より多く、GGと同じか少なく。複数は「；」で区切る</td></tr>
   </table></div><p class="hint">使わない列は消してかまいません（消した列の内容は、今の設定のまま変わりません）。列があって空欄の場合は「設定なし」になります。</p></details>`;
   if(pv&&pv.err)h+=`<div class="box err" style="margin-top:12px">${esc(pv.err)}</div>`;
   if(pv&&pv.rows){
@@ -1547,7 +1550,7 @@ function rRosterCsv(){
         z.patShare?'割合 '+(Object.entries(z.patShare).map(([id,v])=>`${pn(id)} ${v}%`).join('・')||'—'):'',
         'prefShare' in z?'優先 '+(z.prefShare==null?'—':z.prefDays.map((v,i)=>v?WD[i]:'').join('')+' '+z.prefShare+'%'):'',
         z.slotMax?'時間帯 '+(Object.entries(z.slotMax).map(([id,v])=>{const sl=S.patterns.flatMap(p=>p.slots).find(x=>x.id===id);return `${sl?sl.name:'?'}=${v}`}).join('・')||'—'):'',
-        z.balance?'バランス '+(z.balance.map(r=>`${r.b==='*'?'他の全員':r.b}${r.rel==='gt'?'より多く':'と同じか多く'}${r.diff!=null?`(差${r.diff})`:''}`).join('・')||'—'):''
+        z.balance?'バランス '+(z.balance.map(r=>`${r.b==='*'?'他の全員':r.b}${REL_TXT[r.rel]||REL_TXT.ge}${r.diff!=null?`(差${r.diff})`:''}`).join('・')||'—'):''
       ].filter(x=>x&&!/—$/.test(x)).join(' / ')||'—')}</td>
       <td style="text-align:left;color:var(--off);white-space:normal;min-width:180px">${esc(r.warn.join(' / '))}</td></tr>`}).join('')}
     </table></div>
