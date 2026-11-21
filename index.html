@@ -623,6 +623,8 @@ function tplBuild(t){
   const balance=(t.balance||[]).map(([a,b,rel,diff])=>({id:uid(),a:U(a).id,b:b==='*'?'*':U(b).id,rel,diff:diff??null}));
   return migrate({v:1,month:nextMonth(),settings:Object.assign(defSettings(),t.settings||{},{facility:t.facility||''}),patterns:pats,users,wishD:{},extraHol:[],results:{},balance});
 }
+const ROT_DAY={first:'週の最初の勤務日（週明け）','1':'毎週の月曜','2':'毎週の火曜','3':'毎週の水曜','4':'毎週の木曜','5':'毎週の金曜','6':'毎週の土曜','0':'毎週の日曜'};
+const rotDayShort=d=>String(d)==='first'?'週明け':WD[+d]+'曜';
 const REL_TXT={ge:'と同じか多く',gt:'より多く',le:'と同じか少なく',lt:'より少なく'};
 const NAMES=['青木','石井','上田','遠藤','大野','加藤','菊地','工藤','小林','斉藤','佐々木','清水','鈴木','高田','田村','中島','西村','野口','橋本','藤田'];
 const TEMPLATES=[
@@ -726,6 +728,7 @@ function sampleState(){
 }
 function migrate(s){
   s.patterns=s.patterns||[];
+  s.rotations=Array.isArray(s.rotations)?s.rotations:[];s.rotations.forEach(r=>{r.members=(r.members||[]).slice(0,3);while(r.members.length<3)r.members.push('');r.day=String(r.day??'first')});
   (s.users||[]).forEach(u=>{const sp=u.sp||{};if(!Array.isArray(sp.weekPats))sp.weekPats=sp.weekEach?(u.pats||[]).slice():[];delete sp.weekEach});
   s.patterns.forEach(p=>{if(!Array.isArray(p.offDays))p.offDays=[true,false,false,false,false,false,true];if(typeof p.offHol!=='boolean')p.offHol=true;if(!('maxOD' in p))p.maxOD=null});s.users=s.users||[];s.extraHol=s.extraHol||[];s.results=s.results||{};
   // 希望は実際の日付（YYYY-MM-DD）で保存する。旧形式（月ごと・日の番号）から移し替え
@@ -967,7 +970,14 @@ function buildProblem(){
   const bal=(S.balance||[]).map(r=>{const a=uix[r.a];if(a==null)return null;
     const bs=r.b==='*'?U.map((E,k)=>k).filter(k=>k!==a):(uix[r.b]!=null&&uix[r.b]!==a?[uix[r.b]]:[]);
     return bs.length?{a,bs,rel:REL_TXT[r.rel]?r.rel:'ge',diff:isNum(r.diff)?r.diff:null}:null}).filter(Boolean);
-  return{mi,inst,U,can,base,avoid,cand,bal,excl,errors,byPat,groupP,groupS,nP:S.patterns.length,nS:slots.length,slots,prevInfo,groups,week,nW,groupAll};
+  // 週ごとの交代（週明けの勤務などを、決めた人たちで週ごとに交代。無理なときは1人目を優先）
+  const rot=(S.rotations||[]).map(r=>{const pi=S.patterns.findIndex(p=>p.id===r.pid);if(pi<0)return null;
+    const mem=[...new Set((r.members||[]).map(id=>uix[id]).filter(k=>k!=null))];if(mem.length<2)return null;
+    const weeks=[];for(let w=0;w<nW;w++){let d=null;
+      for(let dd=1;dd<=mi.nd;dd++){if(week[dd]!==w)continue;if(String(r.day)!=='first'&&mi.wd[dd]!==+r.day)continue;if(inst.some(x=>x.d===dd&&x.pi===pi)){d=dd;break}}
+      if(d!=null)weeks.push({w,d,is:inst.map((x,i)=>x.d===d&&x.pi===pi?i:-1).filter(i=>i>=0)})}
+    return weeks.length?{pi,mem,weeks,day:String(r.day)}:null}).filter(Boolean);
+  return{mi,inst,U,can,base,avoid,cand,bal,excl,errors,byPat,groupP,groupS,nP:S.patterns.length,nS:slots.length,slots,prevInfo,groups,week,nW,groupAll,rot};
 }
 /* 休み希望に当たる日（当たらなければ0）。offPrev のときは、休み希望日の前日に始まり当日にかかる勤務も当たる */
 function offDay(E,x){
@@ -979,7 +989,7 @@ function offDay(E,x){
 /* ---------- 勤務表の計算（最適化：焼きなまし法） ----------
    必ず守る条件を破ると大きな減点、希望がかなわない・偏りは小さな減点。
    減点の合計がいちばん小さい組み合わせを探します。 */
-const W_WEEKEACH=150,WH=1000,W_WISHW=20,W_WISHO=40,W_FAIR=4,W_FAIRWK=3,W_FAIRSL=2,W_WEEK=60,W_SHARE=6,W_PREF=6,W_CONSEC=80,W_AVOID=50,W_BAL=70,W_SPREAD=8,W_FAIRTOT=30;
+const W_ROT=60,W_ROTNONE=40,W_ROTPREF=6,W_WEEKEACH=150,WH=1000,W_WISHW=20,W_WISHO=40,W_FAIR=4,W_FAIRWK=3,W_FAIRSL=2,W_WEEK=60,W_SHARE=6,W_PREF=6,W_CONSEC=80,W_AVOID=50,W_BAL=70,W_SPREAD=8,W_FAIRTOT=30;
 function makeSolver(P){
   const I=P.inst,U=P.U,nU=U.length,nP=P.nP,nS=P.nS,GR=P.groups;
   const asg=I.map(x=>new Array(x.need).fill(-1));
@@ -1028,7 +1038,9 @@ function makeSolver(P){
     if(r.rel==='le'||r.rel==='lt'){let d=Math.max(0,ca-(r.rel==='lt'?cb-1:cb));if(r.diff!=null)d+=Math.max(0,cb-ca-r.diff);return d}
     let d=Math.max(0,(r.rel==='gt'?cb+1:cb)-ca);if(r.diff!=null)d+=Math.max(0,ca-cb-r.diff);return d}
   function balance(){let p=0;for(const r of P.bal)for(const b of r.bs)p+=balDev(r,b);return p*W_BAL}
-  function total(){let h=unfilled,s=0;for(let u=0;u<nU;u++){h+=uh[u];s+=us[u]}return h*WH+s+fair()+balance()}
+  function rotSeq(r){return r.weeks.map(wk=>{let m=-1;for(const i of wk.is)for(let q=0;q<req[i];q++){const j=r.mem.indexOf(asg[i][q]);if(j>=0&&(m<0||j<m))m=j}return m})}
+  function rotation(){if(!P.rot.length)return 0;let pen=0;for(const r of P.rot){let prev=-1;for(const m of rotSeq(r)){if(m<0)pen+=W_ROTNONE;else{if(m>0)pen+=W_ROTPREF;if(m===prev)pen+=W_ROT}prev=m}}return pen}
+  function total(){let h=unfilled,s=0;for(let u=0;u<nU;u++){h+=uh[u];s+=us[u]}return h*WH+s+fair()+balance()+rotation()}
   function setPos(i,k,u){const old=asg[i][k];if(old===u)return old;
     if(old>=0){rem(old,i);evalUser(old)}else unfilled--;
     if(u>=0){add(u,i);evalUser(u)}else unfilled++;
@@ -1134,6 +1146,11 @@ function makeSolver(P){
       if(av.length)soft.push(`${E.name}さん：${av.map(d=>fd(mi,d)).join('、')} は「できれば避ける」日ですが勤務が入っています（要相談）`);
       if(brO.length)soft.push(`${E.name}さん：休み希望 ${brO.map(d=>fd(mi,d)).join('、')} に勤務${E.offPrev?'（前日からの夜勤を含む）':''}が入っています`);
     });
+    for(const r of P.rot){const sq2=rotSeq(r),pn=S.patterns[r.pi].name,lb=`${pn}・${rotDayShort(r.day)}`,nm=k=>U[k].name;
+      const none=r.weeks.filter((wk,j)=>sq2[j]<0).map(wk=>fd(mi,wk.d));
+      if(none.length)soft.push(`週ごとの交代（${lb}）：${none.join('、')} は担当（${r.mem.map(nm).join('・')}）が入っていません`);
+      const same=[];for(let j=1;j<sq2.length;j++)if(sq2[j]>=0&&sq2[j]===sq2[j-1])same.push(`${fd(mi,r.weeks[j-1].d)}と${fd(mi,r.weeks[j].d)}は続けて${nm(r.mem[sq2[j]])}さん`);
+      if(same.length)soft.push(`週ごとの交代（${lb}）：${same.join('、')}`)}
     for(const r of P.bal)for(const b of r.bs)if(balDev(r,b)){const ca=uL[r.a].length,cb=uL[b].length;
       soft.push(`回数のバランス：${U[r.a].name}さん（${ca}回）を${U[b].name}さん（${cb}回）${REL_TXT[r.rel]||REL_TXT.ge}${r.diff!=null?`（差は${r.diff}回まで）`:''}する目安が守れませんでした`)}
     return{viol,soft,hard:hardSum()};
@@ -1308,7 +1325,7 @@ function rHome(){
 /* 使い方の説明（ヘルプ画面と、ダッシュボードの「？」の両方で使う） */
 function helpContent(){
   const st=[['pat','grid','勤務パターンを登録する','勤務の「型」を作ります。「＋ パターン追加」で増やし、一覧の名前を押すと設定が開きます。時間帯（開始・終了・人数）、繰り返す曜日、祝日の扱い、勤務間インターバル・月の上限などの条件を入れます。「1が1人、または2と5が1人ずつ」のような組み合わせも設定できます。休み希望の上限は、月全体のほかに「土日祝は月1日まで」のように曜日を決めた上限も入れられます。夜勤の前の休み・連勤・かけもちの間隔は、下の「全体の設定」（押すと開きます）で決めます。年末年始などの休日は「休日カレンダー」に足します。'],
-    ['usr','users','メンバーを登録する','「＋ メンバー追加」で増やし、入れるパターンを選びます。一覧の名前を押すと、その人だけの条件（勤務できない曜日・時間、週の回数の目安、毎週入れるパターン、連勤の上限、休み希望の上限、時間帯ごとの上限 など）を入れられます。決めた条件は名前の横に表示されます。「メンバー間の回数のバランス」では、「AさんをBさんと同じか多く／より多く／と同じか少なく／より少なく」を決められます。名簿CSV（Excel）でまとめて登録もできます。'],
+    ['usr','users','メンバーを登録する','「＋ メンバー追加」で増やし、入れるパターンを選びます。一覧の名前を押すと、その人だけの条件（勤務できない曜日・時間、週の回数の目安、毎週入れるパターン、連勤の上限、休み希望の上限、時間帯ごとの上限 など）を入れられます。決めた条件は名前の横に表示されます。「メンバー間の回数のバランス」では、「AさんをBさんと同じか多く／より多く／と同じか少なく／より少なく」を決められます。「週ごとの交代」では、週明けの勤務などを決めた人たちで週ごとに交代させられます（無理なときは1人目を優先）。名簿CSV（Excel）でまとめて登録もできます。'],
     ['wish','calcheck','勤務希望・休み希望を入れる','名前を選び、「勤務希望」か「休み希望」を選んでからカレンダーの日付を押します。上限（曜日を決めた上限を含む）を超える日は入りません。Googleフォームでメンバーから集めて、まとめて取り込むこともできます。'],
     ['gen','spark','勤務表を自動作成する','上の「新しい勤務表を作成」を押すと、条件を守りながら、できるだけ公平になるように自動で作ります。どうしても作れないときは、その理由と見直し方を表示します。'],
     ['chk','table','できた勤務表を確認する','日別・個人別・集計を切り替えて確かめます。かなわなかった希望や目安も表示します。CSV（Excel）での書き出しや印刷もできます。'],
@@ -1394,6 +1411,7 @@ function condText(u){
   const wk=wkText(sp);if(wk)t.push('週'+wk+'回');
   if(isNum(sp.consecMax))t.push(`連勤≦${sp.consecMax}日`);
   {const wp=S.patterns.filter(p=>(sp.weekPats||[]).includes(p.id)&&u.pats.includes(p.id));if(wp.length)t.push('毎週：'+wp.map(p=>p.name).join('・'))}
+  {const rt=rotText(u);if(rt)t.push('交代：'+rt.replace(/；/g,'・'))}
   if(isNum(sp.max))t.push(`月${sp.max}回まで`);
   S.patterns.filter(p=>u.pats.includes(p.id)).forEach(p=>p.slots.forEach(sl=>{const v=sp.slotMax[sl.id];if(isNum(v))t.push(v===0?`「${sl.name}」なし`:`「${sl.name}」${v}回まで`)}));
   sp.ng.forEach(r=>t.push(ngToText(r).replace('（できれば）','はできれば避ける')+(r.soft?'':'は不可')));
@@ -1460,6 +1478,14 @@ function rUsers(){
       <td data-label="">差は ${num(`balance.${i}.diff`,r.diff,'なし')} 回まで</td>
       <td class="del"><button class="small danger" data-act="delBal" data-i="${i}">削除</button></td></tr>`).join('')}</table></div>`:'<p class="hint">なし</p>'}
     <button class="small" data-act="addBal" ${S.users.length<2?'disabled':''}>＋ ルールを追加</button></section>`;
+  const po={};S.patterns.forEach(p=>po[p.id]=p.name||'(無名)');
+  h+=`<section class="card"><h2>週ごとの交代</h2>
+    <p class="hint">週明けの勤務などを、決めた人たちで週ごとに交代で担当します（できるだけ）。無理な週は、1人目を優先します。<br>例：「A（外来）」の「週の最初の勤務日（週明け）」を、DDさん → EEさん で交代（無理なときはDDさん）</p>
+    ${S.rotations.length?`<div class="tablewrap"><table class="edit stack">${S.rotations.map((r,i)=>`<tr>
+      <td data-label="">${sel(`rotations.${i}.pid`,r.pid,po)} の</td><td data-label="">${sel(`rotations.${i}.day`,r.day,ROT_DAY)} を</td>
+      <td data-label="">${[0,1,2].map(j=>sel(`rotations.${i}.members.${j}`,r.members[j]||'',Object.assign({'':j<2?'（選ぶ）':'（なし）'},uo))).join(' → ')} で交代</td>
+      <td class="del"><button class="small danger" data-act="delRot" data-i="${i}">削除</button></td></tr>`).join('')}</table></div>`:'<p class="hint">なし</p>'}
+    <button class="small" data-act="addRot" ${S.users.length<2||!S.patterns.length?'disabled':''}>＋ 交代を追加</button></section>`;
   return h;
 }
 
@@ -1481,10 +1507,12 @@ const RCOL=[ // [保存する列名, 読み込みで受け付ける見出し]
   ['毎週入れるパターン',['毎週入れるパターン','毎週どのパターンにも','毎週どのパターンにも入る','毎週両方']],
   ['優先する曜日',['優先する曜日','優先曜日']],
   ['時間帯ごとの上限',['時間帯ごとの上限','時間帯の上限']],
-  ['回数のバランス',['回数のバランス','バランス']]];
+  ['回数のバランス',['回数のバランス','バランス']],
+  ['交代で担当',['交代で担当','週ごとの交代','交代']]];
 const nz=t=>zen2han(t).replace(/\s/g,'');
 const splitList=t=>zen2han(t).split(/[\/／;；\n]/).map(x=>x.trim()).filter(Boolean);
 function wkText(sp){const a=sp.wkMin,b=sp.wkMax;if(!isNum(a)&&!isNum(b))return'';if(isNum(a)&&isNum(b))return a===b?String(a):`${a}-${b}`;return isNum(a)?`${a}以上`:`${b}まで`}
+function rotText(u){return (S.rotations||[]).map(r=>{const j=(r.members||[]).indexOf(u.id);const p=S.patterns.find(x=>x.id===r.pid);return j>=0&&p?`${p.name} ${rotDayShort(r.day)} ${j+1}`:''}).filter(Boolean).join('；')}
 function balText(u){const nm=id=>id==='*'?'他の全員':((S.users.find(x=>x.id===id)||{}).name||'?');
   return (S.balance||[]).filter(r=>r.a===u.id).map(r=>`${nm(r.b)}${REL_TXT[r.rel]||REL_TXT.ge}${isNum(r.diff)?`（差${r.diff}回まで）`:''}`).join('；')}
 const zen2han=t=>String(t??'').replace(/[０-９Ａ-Ｚａ-ｚ：－]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[〜～―‐−]/g,'-').replace(/　/g,' ').trim();
@@ -1536,16 +1564,16 @@ function rosterRows(){ // 今の名簿を表に
       S.patterns.filter(p=>u.pats.includes(p.id)&&isNum(sp.patShare[p.id])).map(p=>`${p.name} ${sp.patShare[p.id]}%`).join('／'),S.patterns.filter(p=>(sp.weekPats||[]).includes(p.id)&&u.pats.includes(p.id)).map(p=>p.name).join('／'),
       sp.prefDays.some(Boolean)&&isNum(sp.prefShare)?sp.prefDays.map((v,i)=>v?WD[i]:'').join('')+' '+sp.prefShare+'%':'',
       S.patterns.filter(p=>u.pats.includes(p.id)).flatMap(p=>p.slots.filter(sl=>isNum(sp.slotMax[sl.id])).map(sl=>`${sl.name}=${sp.slotMax[sl.id]}`)).join('／'),
-      balText(u)]});
+      balText(u),rotText(u)]});
 }
 function csvText(rows){const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';return '﻿'+rows.map(r=>r.map(q).join(',')).join('\r\n')}
 function rosterTemplate(){
   const pn=S.patterns.map(p=>p.name);const a=pn[0]||'パターン名',b=pn[1]||a;
   const sl=(S.patterns[0]&&S.patterns[0].slots[0]&&S.patterns[0].slots[0].name)||'時間帯名';
   return[RCOL.map(c=>c[0]),
-    ['田中 一郎',pn.length>1?a+'／'+b:a,'','','','','','','','','','2-3',pn.length>1?`${a} 60%／${b} 40%`:'',pn.length>1?a+'／'+b:'','','','佐藤 花子と同じか多く（差1回まで）'],
-    ['佐藤 花子',a,'6','','','1','','水','月 祝翌 終日（できれば）','','3','2','','','火木 70%',`${sl}=2`,''],
-    ['鈴木 次郎',b,'','2','','','1日0時間','','平日 18:00-08:00；祝 終日','入れない','','3','','','','','他の全員より多く']];
+    ['田中 一郎',pn.length>1?a+'／'+b:a,'','','','','','','','','','2-3',pn.length>1?`${a} 60%／${b} 40%`:'',pn.length>1?a+'／'+b:'','','','佐藤 花子と同じか多く（差1回まで）',pn.length>1?`${a} 週明け 1`:''],
+    ['佐藤 花子',a,'6','','','1','','水','月 祝翌 終日（できれば）','','3','2','','','火木 70%',`${sl}=2`,'',''],
+    ['鈴木 次郎',b,'','2','','','1日0時間','','平日 18:00-08:00；祝 終日','入れない','','3','','','','','他の全員より多く',pn.length>1?`${a} 週明け 2`:'']];
 }
 function rosterPreview(text){
   const rows=parseCSV(text);if(rows.length<2)return{err:'見出しの行と、1人分以上のデータが必要です。'};
@@ -1607,6 +1635,11 @@ function rosterPreview(text){
         if(b!=='*'&&!S.users.some(u=>u.name.trim()===b)&&!rows.slice(1).some(r=>String(r[col['名前']]??'').trim()===b)){it.warn.push(`回数のバランス：「${b}」さんが名簿にいません`);return}
         rs.push({b,rel:{'より多く':'gt','と同じか少なく':'le','以下':'le','より少なく':'lt'}[m[2]]||'ge',diff:m[3]!=null?+m[3]:null})});
       it.set.balance=rs}
+    if(g('交代で担当')!==undefined){const rs=[];
+      splitList(g('交代で担当').replace(/[;；]/g,'；')).forEach(e=>{const mm=/^(.+?)\s*(週明け|週の最初の勤務日|週の最初|[日月火水木金土])曜?日?\s*(\d+)?\s*(?:番目?|人目)?$/.exec(e);const pp=mm&&S.patterns.find(x=>nz(x.name)===nz(mm[1]));
+        if(!pp){it.warn.push(`交代で担当「${e}」が読めません（例：A（外来） 週明け 1）`);return}
+        rs.push({pid:pp.id,day:/週/.test(mm[2])?'first':String(WD.indexOf(mm[2])),ord:mm[3]?+mm[3]:99})});
+      it.set.rot=rs}
     out.push(it);
   });
   if(!out.length)return{err:'名前の入った行がありません。'};
@@ -1614,14 +1647,19 @@ function rosterPreview(text){
 }
 function applyRoster(pv){
   const last={};pv.rows.forEach(it=>last[it.name]=it);
+  const rotCol=pv.rows.some(it=>'rot' in it.set);
   Object.values(last).forEach(it=>{
     let u=S.users.find(x=>x.name.trim()===it.name);
     if(!u){u={id:'u_'+uid(),name:it.name,pats:[],sp:blankSp()};S.users.push(u)}
     const z=it.set;if(z.pats)u.pats=z.pats;
     ['max','maxW','maxO','maxOD','intD','intH','offPrev','consecMax','wkMin','wkMax','patShare','prefDays','prefShare','slotMax'].forEach(k=>{if(k in z)u.sp[k]=z[k]});
     if('weekPats' in z)u.sp.weekPats=z.weekPats==='ALL'?u.pats.slice():z.weekPats.filter(id=>u.pats.includes(id));
+    if(z.rot)it.uidNew=u.id;
     if(z.ng)u.sp.ng=z.ng;
   });
+  if(rotCol){const groups={};Object.values(last).forEach(it=>{if(!it.set.rot||!it.uidNew)return;it.set.rot.forEach(x=>{const k=x.pid+'|'+x.day;(groups[k]=groups[k]||[]).push({uid:it.uidNew,ord:x.ord})})});
+    S.rotations=Object.entries(groups).map(([k,a])=>{const [pid,day]=k.split('|');const ex=S.rotations.find(r=>r.pid===pid&&String(r.day)===day);
+      const mem=a.sort((x,y)=>x.ord-y.ord).map(x=>x.uid).slice(0,3);while(mem.length<3)mem.push('');return{id:ex?ex.id:uid(),pid,day,members:mem}}).filter(r=>r.members.filter(Boolean).length>=2)}
   Object.values(last).forEach(it=>{if(!it.set.balance)return;const u=S.users.find(x=>x.name.trim()===it.name);
     S.balance=S.balance.filter(r=>r.a!==u.id);
     it.set.balance.forEach(r=>{const b=r.b==='*'?'*':(S.users.find(x=>x.name.trim()===r.b)||{}).id;if(b&&b!==u.id)S.balance.push({id:uid(),a:u.id,b,rel:r.rel,diff:r.diff})})});
@@ -1645,6 +1683,7 @@ function rRosterCsv(){
     <tr><td>連勤の上限</td><td>数字（例：3）。全体の上限より大きいと「どうしても必要なときだけ」</td></tr>
     <tr><td>週の回数</td><td>目安。例：3、2-3、3以上、3まで</td></tr>
     <tr><td>パターンの割合</td><td>例：日勤 60%／夜勤 40%</td></tr>
+    <tr><td>交代で担当</td><td>「パターン名 週明け 順番」。同じパターン・同じ日の人どうしで週ごとに交代し、無理なときは順番1の人を優先。例：A（外来） 週明け 1（相手の人は A（外来） 週明け 2）。曜日を決めるときは「A（外来） 月 1」。複数は「；」で区切る。この列があると、交代の設定はCSVの内容に置き換わります</td></tr>
     <tr><td>毎週入れるパターン</td><td>毎週1回は入れるパターン名（できるだけ）。複数は「／」で区切る（例：外来／センター）。「する」＝入れるパターン全部。空欄＝なし</td></tr>
     <tr><td>優先する曜日</td><td>例：火木 70%</td></tr>
     <tr><td>時間帯ごとの上限</td><td>月の上限。「時間帯名=回数」を「／」で区切る。0＝入らない。例：2=2／5=0</td></tr>
@@ -1666,7 +1705,7 @@ function rRosterCsv(){
       <td style="text-align:left">${z.ng?esc(z.ng.map(ngToText).join('；'))||'—':'<span class="hint">変更なし</span>'}</td>
       <td>${'offPrev' in z?(z.offPrev==null?'全体どおり':z.offPrev?'入れない':'入れてよい'):'<span class="hint">変更なし</span>'}</td>
       <td style="text-align:left;white-space:normal;min-width:200px">${esc([
-        'consecMax' in z?`連勤${z.consecMax==null?'—':z.consecMax+'日まで'}`:'','weekPats' in z&&(z.weekPats==='ALL'||z.weekPats.length)?'毎週：'+(z.weekPats==='ALL'?'全部':z.weekPats.map(id=>(S.patterns.find(p=>p.id===id)||{}).name).join('・')):'',
+        'consecMax' in z?`連勤${z.consecMax==null?'—':z.consecMax+'日まで'}`:'',z.rot&&z.rot.length?'交代：'+z.rot.map(x=>`${(S.patterns.find(p=>p.id===x.pid)||{}).name} ${rotDayShort(x.day)} ${x.ord===99?'':x.ord}`).join('・'):'','weekPats' in z&&(z.weekPats==='ALL'||z.weekPats.length)?'毎週：'+(z.weekPats==='ALL'?'全部':z.weekPats.map(id=>(S.patterns.find(p=>p.id===id)||{}).name).join('・')):'',
         'wkMin' in z?`週${wkText({wkMin:z.wkMin,wkMax:z.wkMax})||'—'}回`:'',
         z.patShare?'割合 '+(Object.entries(z.patShare).map(([id,v])=>`${pn(id)} ${v}%`).join('・')||'—'):'',
         'prefShare' in z?'優先 '+(z.prefShare==null?'—':z.prefDays.map((v,i)=>v?WD[i]:'').join('')+' '+z.prefShare+'%'):'',
@@ -2220,6 +2259,8 @@ document.addEventListener('click',e=>{
     delPat(){const p=S.patterns[D.pi];if(!confirm(`「${p.name}」を削除しますか？`))return false;S.patterns.splice(D.pi,1);S.users.forEach(u=>u.pats=u.pats.filter(id=>id!==p.id))},
     addSlot(){S.patterns[D.pi].slots.push({id:uid(),name:'',abbr:'',start:'08:30',end:'17:15',need:1,days:allDays(true),hol:'normal'})},
     delSlot(){S.patterns[D.pi].slots.splice(D.si,1)},
+    addRot(){S.rotations.push({id:uid(),pid:S.patterns[0].id,day:'first',members:[S.users[0].id,(S.users[1]||{}).id||'','']})},
+    delRot(){S.rotations.splice(+D.i,1)},
     addBal(){S.balance.push({id:uid(),a:S.users[0].id,b:'*',rel:'ge',diff:null})},
     delBal(){S.balance.splice(D.i,1)},
     addCombo(){S.patterns[D.pi].combos.push({id:uid(),counts:{}})},
