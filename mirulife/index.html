@@ -240,7 +240,9 @@ details.ucard{padding:0}
 .ulist details.ucard{margin:0;border-top:0;padding:0;border-bottom:1px solid var(--line);background:none}
 .ulist details.ucard>summary.usum{padding:8px 16px;flex-wrap:nowrap}
 .ulist details.ucard>summary.usum .chipsP{flex:0 0 auto}
+.ulist details.ucard>summary.usum>b{flex:0 0 auto;white-space:nowrap;max-width:45%;overflow:hidden;text-overflow:ellipsis}
 .ulist details.ucard[open]{background:#fbfdfd}
+.ulist .ubody.pcard{border-top:0;background:none;border-left:4px solid var(--pc);border-radius:0}
 details.ucard>summary.usum .ucond{font-size:12px;color:var(--sub);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 details.ucard>summary.usum{cursor:pointer}
 details.ucard>summary.usum{list-style:none;padding:12px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:15px;color:var(--ink)}
@@ -654,7 +656,7 @@ function rTemplates(){
 function loadTemplate(k,ask){
   const t=TEMPLATES.find(x=>x.k===k);if(!t)return false;
   if(ask&&!confirm(`見本「${t.title}」で始めますか？\n今の内容は置き換わります（残したい場合は、先に「保存・出力」→「ファイルに書き出す」で保存してください）。`))return false;
-  S=t.build();UI.tab='home';UI.openU=new Set();save();render();toast(`見本「${t.title}」を読み込みました`);track('template_load',{template:k});return true;
+  S=t.build();UI.tab='home';UI.openU=new Set();UI.openP=new Set();save();render();toast(`見本「${t.title}」を読み込みました`);track('template_load',{template:k});return true;
 }
 
 /* ===== アクセス解析（Vercel Web Analytics：Cookieなし。勤務表の中身・名前は送らない） ===== */
@@ -724,7 +726,7 @@ function migrate(s){
 }
 const FRESH=!load();
 let S=migrate(load()||sampleState());
-const UI={calMode:'month',calWk:0,drawer:false,tab:'home',wu:null,mode:'W',budget:3000,busy:false,hist:null,view:'day',pv:null,openU:new Set()};
+const UI={calMode:'month',calWk:0,drawer:false,tab:'home',wu:null,mode:'W',budget:3000,busy:false,hist:null,view:'day',pv:null,openU:new Set(),openP:new Set()};
 /* 保存期間を過ぎた月の勤務表・希望を消す（monthsToPurge で対象を確認） */
 function monthsToPurge(keep){
   if(keep==null)return[];const cut=addMonth(thisMonth(),-keep);
@@ -1286,21 +1288,20 @@ function rHelp(){
 function rPatterns(){
   const mi=monthInfo();
   const hl=Object.entries(mi.hol).filter(([d,n])=>n).map(([d,n])=>`${lab(mi,+d)} ${n}`).join('、')||'なし';
-  let h=`<div class="lead">勤務の「型」を登録します。型ごとに、時間帯（開始・終了・人数・曜日・祝日の扱い）と勤務条件を決めます。<br>終了が開始より早い時刻なら「翌日まで」の勤務（夜勤など）として扱います。</div>`+rPatternCsv()+`
-  <section class="card" id="globalSettings"><h2>${ico('gear')}全体の設定</h2><div class="grid">
+  let h=`<div class="lead">勤務の「型」を登録します。型ごとに、時間帯（開始・終了・人数・曜日・祝日の扱い）と勤務条件を決めます。<br>終了が開始より早い時刻なら「翌日まで」の勤務（夜勤など）として扱います。名前を押すと、そのパターンの設定が開きます。</div>`;
+  const gs=`<section class="card" id="globalSettings"><h2>${ico('gear')}全体の設定</h2><div class="grid">
     <label>休み希望日の前の晩の夜勤<span>${sel('settings.offPrev',!!S.settings.offPrev,{false:'入れてよい',true:'入れない'})}</span>
       <small>夜勤のように日をまたぐ勤務は、休み希望日の朝まで続きます。<br>例：10日が休み希望のとき<br>・入れてよい → 9日の夜勤（10日の朝まで）には入ることがある<br>・入れない → 9日の夜勤にも入らない（10日をまるごと空ける）<br>人ごとに変えるときは「メンバー」→「特別な勤務条件」で。</small></label>
     <label>続けて勤務できる日数<span>${num('settings.consec',S.settings.consec,'なし')} 日まで</span>
       <small>例：5 → 6日続けての勤務は入れない。空欄なら制限なし。<br>勤務のない日（休み・休日）をはさむと、また1日目から数えます。<br>人ごとに変えるときは「メンバー」→「特別な勤務条件」で。</small></label>
     <label>かけもちする人の「次の勤務までの時間」<span>${sel('settings.intMode',S.settings.intMode,{common:'長い方にそろえる',perPattern:'直前の勤務に合わせる'})}</span>
       <small>勤務のあと次の勤務まで最低あける時間（勤務間インターバル）は、パターンごとに決めています。日勤と夜勤の両方に入る人のように、<b>あける時間が違うパターンをかけもちする人</b>だけに関係する設定です（1つのパターンだけの人は関係ありません）。<br>例：日勤のあとは「0時間」、夜勤のあとは「1日」あける設定のとき<br>・長い方にそろえる → 日勤のあとも1日あける（その日の夜勤にも、翌日の日勤にも入れない）<br>・直前の勤務に合わせる → 日勤のあとは続けて夜勤に入れる。夜勤のあとは1日あける</small></label>
-  </div></section>`;
+  </div></section>`+rPatternCsv();
   h+=`<section class="card"><div class="cardhead"><h2>${ico('grid')}勤務パターン設定</h2><button class="primary small" data-act="addPat">＋ パターン追加</button></div>
-    <div class="slotgrid">${S.patterns.flatMap((p,pi)=>p.slots.map(sl=>{const ov=toMin(sl.end)<=toMin(sl.start);
-      return `<div class="slotcard"><div class="sc-h">${pcodeBadge(pi)}<b>${esc(sl.name||'(無名)')}</b><button class="kebab" data-act="goPat" data-pi="${pi}" title="${esc(p.name)}を編集">${ico('more')}</button></div><div class="sc-p">${esc(p.name)}</div>
-        <div class="sc-t">${esc(sl.start)}〜${ov?'翌':''}${esc(sl.end)}</div><div class="sc-n">${ico('users')}${p.mode==='combo'?'人数：組み合わせで決定':`必要人数：${sl.need||0}名`}・${esc(daysText(sl.days)||'曜日なし')}</div></div>`})).join('')||'<p class="hint">まだありません。「＋ パターン追加」から登録してください。</p>'}</div></section>`;
+    <div class="ulist">`;
   S.patterns.forEach((p,pi)=>{
-    h+=`<section class="card pcard" id="pat-${pi}" style="--pc:${pcolor(pi)}"><div class="cardhead">${pcodeBadge(pi)}<input type="text" class="title" data-path="patterns.${pi}.name" value="${esc(p.name)}" placeholder="パターンの名前（例：早番）">
+    const open=UI.openP.has(p.id);
+    h+=`<details class="ucard" data-pid="${p.id}" id="pat-${pi}" ${open?'open':''}><summary class="usum">${pcodeBadge(pi)}<b>${esc(p.name||'(無名)')}</b><span class="ucond">${esc(patSummary(p))}</span><span class="tog">${open?'閉じる':''}</span></summary><div class="ubody pcard" style="--pc:${pcolor(pi)}"><div class="cardhead">${pcodeBadge(pi)}<input type="text" class="title" data-path="patterns.${pi}.name" value="${esc(p.name)}" placeholder="パターンの名前（例：早番）">
       <label class="row" style="gap:6px;font-size:13px;color:var(--sub)">略称 <input type="text" style="width:70px" maxlength="4" data-path="patterns.${pi}.code" data-rr value="${esc(p.code||'')}" placeholder="${esc(pcode(Object.assign({},p,{code:''})))}"></label>
       <button class="danger small" data-act="delPat" data-pi="${pi}">このパターンを削除</button></div>
       <h3>シフト時間（時間帯）</h3>
@@ -1331,9 +1332,9 @@ function rPatterns(){
         <label>休み希望の扱い<span>${sel(`patterns.${pi}.hardO`,!!p.hardO,{true:'必ずかなえる',false:'できるだけかなえる'})}</span></label>
         <label>各メンバーの時間帯<span>${sel(`patterns.${pi}.spread`,!!p.spread,{false:'特に決めない',true:'できるだけ満遍なく'})}</span><small>満遍なく：各人の勤務を、各時間帯の日数の割合に合わせて配分します（例：月水・木・火金の体制にまんべんなく）</small></label>
         <label>メンバーの回数<span>${sel(`patterns.${pi}.fair`,p.fair!==false,{true:'できるだけそろえる（公平）',false:'そろえない（各人の目安に任せる）'})}</span><small>「週の勤務回数」の目安がある人は、そろえる対象から外します</small></label>
-      </div></section>`;
+      </div></div></details>`;
   });
-  h+=`<p><button class="primary" data-act="addPat">＋ シフトパターンを追加</button></p>
+  h+=`</div>${S.patterns.length?'':'<p class="hint">まだありません。「＋ パターン追加」から登録してください。</p>'}</section>`+gs+`
   <section class="card"><h2>休日カレンダー</h2><p class="hint">日本の祝日（振替休日を含む）は自動で入ります。年末年始など、独自の休日を足すと「祝日」と同じ扱いになります。</p>
   <div>${S.extraHol.map((x,i)=>`<span class="chip">${esc(x.date)} ${esc(x.name)}<button data-act="delHol" data-i="${i}" title="削除">×</button></span>`).join('')}</div>
   <div class="row"><input type="date" id="holDate"><input type="text" id="holName" placeholder="名前（例：年末年始）"><button data-act="addHol">休日を追加</button></div>
@@ -1341,6 +1342,11 @@ function rPatterns(){
   return h;
 }
 
+function patSummary(p){
+  const nm=sl=>p.slots.length>1?(sl.name||'(無名)')+' ':'';
+  if(p.mode==='combo')return p.slots.map(sl=>`${nm(sl)}${sl.start}〜${toMin(sl.end)<=toMin(sl.start)?'翌':''}${sl.end}`).join('／')+'（組み合わせ）';
+  return p.slots.map(sl=>`${nm(sl)}${sl.start}〜${toMin(sl.end)<=toMin(sl.start)?'翌':''}${sl.end}（${sl.need||0}名・${daysText(sl.days)||'曜日なし'}）`).join('／');
+}
 function condText(u){
   const sp=u.sp,E=eff(u),t=[];
   const wk=wkText(sp);if(wk)t.push('週'+wk+'回');
@@ -2129,19 +2135,19 @@ document.addEventListener('change',e=>{
   else if(el.tagName==='SELECT'&&(el.value==='true'||el.value==='false'))v=el.value==='true';
   else v=el.value;
   setPath(S,path,v);save();
-  if(el.dataset.rr!==undefined||UI.tab==='usr')render();
+  if(el.dataset.rr!==undefined||UI.tab==='usr'||UI.tab==='pat')render();
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&(UI.helpOpen||UI.fbOpen)&&!UI.fbBusy){UI.helpOpen=false;UI.fbOpen=false;render()}});
 document.addEventListener('click',e=>{const l=e.target.closest('.pselect');if(!l)return;const i=l.querySelector('input');if(i&&i.showPicker&&e.target!==i){try{i.showPicker()}catch(x){}}});
 document.addEventListener('toggle',e=>{if(e.target&&e.target.id==='gfbox'){UI.gopen=e.target.open;return}});
-document.addEventListener('toggle',e=>{const el=e.target;if(!el.matches||!el.matches('details.ucard'))return;const id=el.dataset.uid;
-  if(el.open)UI.openU.add(id);else UI.openU.delete(id);const t=el.querySelector('.tog');if(t)t.textContent=el.open?'閉じる':''},true);
+document.addEventListener('toggle',e=>{const el=e.target;if(!el.matches||!el.matches('details.ucard'))return;const set=el.dataset.pid?UI.openP:UI.openU,id=el.dataset.pid||el.dataset.uid;
+  if(el.open)set.add(id);else set.delete(id);const t=el.querySelector('.tog');if(t)t.textContent=el.open?'閉じる':''},true);
 document.addEventListener('click',e=>{
   const t=e.target.closest('[data-tab]');if(t){UI.drawer=false;UI.helpOpen=false;UI.fbOpen=false;UI.tab=t.dataset.tab;render();window.scrollTo(0,0);return}
   const b=e.target.closest('[data-act]');if(!b)return;
   const a=b.dataset.act,D=b.dataset;
   const A={
-    addPat(){S.patterns.push({id:'p_'+uid(),name:'新しいパターン',slots:[{id:uid(),name:'日勤',abbr:'日',start:'08:30',end:'17:15',need:1,days:[false,true,true,true,true,true,false],hol:'exclude'}],intD:0,intH:11,maxM:null,maxW:3,maxO:4,hardW:false,hardO:true,mode:'fixed',combos:[],fair:true})},
+    addPat(){S.patterns.push({id:'p_'+uid(),name:'新しいパターン',slots:[{id:uid(),name:'日勤',abbr:'日',start:'08:30',end:'17:15',need:1,days:[false,true,true,true,true,true,false],hol:'exclude'}],intD:0,intH:11,maxM:null,maxW:3,maxO:4,hardW:false,hardO:true,mode:'fixed',combos:[],fair:true});UI.openP.add(S.patterns[S.patterns.length-1].id)},
     delPat(){const p=S.patterns[D.pi];if(!confirm(`「${p.name}」を削除しますか？`))return false;S.patterns.splice(D.pi,1);S.users.forEach(u=>u.pats=u.pats.filter(id=>id!==p.id))},
     addSlot(){S.patterns[D.pi].slots.push({id:uid(),name:'',abbr:'',start:'08:30',end:'17:15',need:1,days:allDays(true),hol:'normal'})},
     delSlot(){S.patterns[D.pi].slots.splice(D.si,1)},
@@ -2171,7 +2177,7 @@ document.addEventListener('click',e=>{
     fbSend(){sendFeedback();return false},
     bell(){UI.tab='home';UI.drawer=false;save();render();setTimeout(()=>{const el=$('#noticeCard');if(el)el.scrollIntoView({behavior:'smooth',block:'center'})},30);return false},
     goSettings(){UI.tab='pat';UI.drawer=false;save();render();setTimeout(()=>{const el=$('#globalSettings');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},30);return false},
-    goPat(){const pi=D.pi;setTimeout(()=>{const el=$('#pat-'+pi);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},30);return false},
+    goPat(){const pi=D.pi;const pp=S.patterns[pi];if(pp){UI.openP.add(pp.id);render()}setTimeout(()=>{const el=$('#pat-'+pi);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},30);return false},
     gCopyCode(){copyText(gasCode());return false},
     gCopyUrl(){const g=S.gforms[S.month];if(g)copyText(g.url);return false},
     gReset(){if(!confirm('Googleフォーム連携をやめますか？（Google側のスクリプトとフォームは残ります）'))return false;S.settings.gas.url='';UI.gmsg=null},
