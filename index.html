@@ -590,38 +590,38 @@ const REL_TXT={ge:'と同じか多く',gt:'より多く',le:'と同じか少な�
 const NAMES=['青木','石井','上田','遠藤','大野','加藤','菊地','工藤','小林','斉藤','佐々木','清水','鈴木','高田','田村','中島','西村','野口','橋本','藤田'];
 const TEMPLATES=[
  {k:'general',title:'一般：日勤・夜勤',desc:'どの職場にも。日勤（毎日2人）と夜勤（毎日1人）。8人',build:()=>sampleState()},
- {k:'ward2',title:'病棟：2交代',desc:'日勤（平日6人・休日4人）と16時間夜勤（毎日2人）。看護師16人。夜勤は月5回まで',build:()=>tplBuild({
-   facility:'サンプル病院 ○○病棟',settings:{intMode:'perPattern',consec:5,offPrev:true},
+ {k:'shift2',title:'大人数：2交代（日勤・夜勤）',desc:'日勤（平日6人・休日4人）と16時間夜勤（毎日2人）。16人。夜勤は月5回まで',build:()=>tplBuild({
+   facility:'サンプル職場 ○○チーム',settings:{intMode:'perPattern',consec:5,offPrev:true},
    patterns:[{name:'日勤',code:'日',intH:11,maxW:2,maxO:4,slots:[{name:'日勤（平日）',abbr:'日',start:'08:30',end:'17:15',need:6,days:WKD,hol:'exclude'},{name:'日勤（休日）',abbr:'日',start:'08:30',end:'17:15',need:4,days:SSD,hol:'add'}]},
      {name:'夜勤',code:'夜',intD:1,maxM:5,maxW:2,maxO:4,slots:[{name:'夜勤',abbr:'夜',start:'16:30',end:'09:00',need:2}]}],
    users:NAMES.slice(0,16).map((n,i)=>({n,p:i<14?['日勤','夜勤']:['日勤'],o:i===14?{wk:[2,3]}:i===15?{wk:[2,3],ng:[0,6],ngHol:true}:i===13?{max:12}:{}}))})},
- {k:'ward3',title:'病棟：3交代',desc:'日勤（平日5人・休日3人）、準夜（2人）、深夜（2人）。看護師20人',build:()=>tplBuild({
-   facility:'サンプル病院 ○○病棟',settings:{intMode:'perPattern',consec:5,offPrev:true},
+ {k:'shift3',title:'大人数：3交代（日勤・夕勤・夜勤）',desc:'日勤（平日5人・休日3人）、夕勤（2人）、夜勤（2人）。20人',build:()=>tplBuild({
+   facility:'サンプル職場 ○○チーム',settings:{intMode:'perPattern',consec:5,offPrev:true},
    patterns:[{name:'日勤',code:'日',intH:7,maxW:2,maxO:4,slots:[{name:'日勤（平日）',abbr:'日',start:'08:30',end:'17:00',need:5,days:WKD,hol:'exclude'},{name:'日勤（休日）',abbr:'日',start:'08:30',end:'17:00',need:3,days:SSD,hol:'add'}]},
-     {name:'準夜',code:'準',intH:11,maxM:5,maxW:2,maxO:4,slots:[{name:'準夜',abbr:'準',start:'16:30',end:'01:00',need:2}]},
-     {name:'深夜',code:'深',intH:11,maxM:5,maxW:2,maxO:4,slots:[{name:'深夜',abbr:'深',start:'00:30',end:'09:00',need:2}]}],
-   users:NAMES.slice(0,20).map((n,i)=>({n,p:i<18?['日勤','準夜','深夜']:['日勤'],o:i===18?{wk:[3,4]}:i===19?{wk:[2,3],ng:[0,6],ngHol:true}:{}}))})},
- {k:'doctor',title:'医師：当直・日直',desc:'当直（毎日1人）と土日祝の日直（1人）。医師8人。当直明けは休み',build:()=>tplBuild({
-   facility:'サンプル病院 内科',settings:{intMode:'perPattern',consec:null,offPrev:true},
-   patterns:[{name:'当直',code:'当',intH:12,maxM:6,maxW:2,maxO:5,slots:[{name:'当直',abbr:'当',start:'17:00',end:'08:30',need:1}]},
+     {name:'夕勤',code:'夕',intH:11,maxM:5,maxW:2,maxO:4,slots:[{name:'夕勤',abbr:'夕',start:'16:30',end:'01:00',need:2}]},
+     {name:'夜勤',code:'夜',intH:11,maxM:5,maxW:2,maxO:4,slots:[{name:'夜勤',abbr:'夜',start:'00:30',end:'09:00',need:2}]}],
+   users:NAMES.slice(0,20).map((n,i)=>({n,p:i<18?['日勤','夕勤','夜勤']:['日勤'],o:i===18?{wk:[3,4]}:i===19?{wk:[2,3],ng:[0,6],ngHol:true}:{}}))})},
+ {k:'duty',title:'宿直・日直',desc:'宿直（毎日1人）と土日祝の日直（1人）。8人。宿直明けは休み',build:()=>tplBuild({
+   facility:'サンプル事業所',settings:{intMode:'perPattern',consec:null,offPrev:true},
+   patterns:[{name:'宿直',code:'宿',intH:12,maxM:6,maxW:2,maxO:5,slots:[{name:'宿直',abbr:'宿',start:'17:00',end:'08:30',need:1}]},
      {name:'日直',code:'日',intH:0,maxW:2,maxO:5,slots:[{name:'日直',abbr:'日',start:'08:30',end:'17:00',need:1,days:SSD,hol:'add'}]}],
-   users:['青木','石井','上田','遠藤','大野','加藤','菊地','工藤'].map((n,i)=>({n,p:['当直','日直'],o:i===0?{slotMax:{'当直/当直':2}}:i===1?{ng:[5]}:i===2?{avoid:[0,6]}:{}}))})},
- {k:'outpatient',title:'外来・検査室',desc:'外来は「終日1人」または「早上がり＋午後」。検査室は曜日で体制が変わる。5人、週の回数の目安つき',build:()=>tplBuild({
-   facility:'サンプル病院 外来・検査室',settings:{intMode:'common',consec:2},
-   patterns:[{name:'外来',code:'外',fair:false,maxW:null,maxO:null,slots:[{name:'終日',abbr:'終',start:'08:30',end:'17:15',days:WKD,hol:'exclude'},{name:'早上がり',abbr:'早',start:'08:30',end:'15:30',days:WKD,hol:'exclude'},{name:'午後',abbr:'午',start:'13:00',end:'17:15',days:WKD,hol:'exclude'}],combos:[{'終日':1},{'早上がり':1,'午後':1}]},
-     {name:'検査室',code:'検',fair:false,spread:true,maxW:null,maxO:null,slots:[{name:'長日（月水）',abbr:'長',start:'08:30',end:'17:00',need:1,days:dset([1,3]),hol:'exclude'},{name:'長日（木）',abbr:'長',start:'08:30',end:'17:00',need:1,days:dset([4]),hol:'exclude'},{name:'短日（火金）',abbr:'短',start:'08:30',end:'15:30',need:1,days:dset([2,5]),hol:'exclude'}]}],
-   users:[{n:'小川',p:['外来'],o:{wk:[2,2],avoid:[1],avoidAfterHol:true,slotMax:{'外来/早上がり':2,'外来/午後':0}}},
-     {n:'斉藤',p:['外来','検査室'],o:{wk:[2,3],consec:3,share:{'外来':60,'検査室':40},slotMax:{'外来/午後':0}}},
-     {n:'松本',p:['外来','検査室'],o:{wk:[2,3],share:{'外来':40,'検査室':60},slotMax:{'外来/午後':0}}},
-     {n:'井上',p:['検査室'],o:{wk:[3,3],consec:3}},
-     {n:'木村',p:['外来'],o:{wk:[2,3],slotMax:{'外来/終日':0,'外来/早上がり':0},pref:[[2,4],70]}}],
+   users:['青木','石井','上田','遠藤','大野','加藤','菊地','工藤'].map((n,i)=>({n,p:['宿直','日直'],o:i===0?{slotMax:{'宿直/宿直':2}}:i===1?{ng:[5]}:i===2?{avoid:[0,6]}:{}}))})},
+ {k:'counter',title:'窓口・作業室',desc:'窓口は「終日1人」または「早上がり＋午後」。作業室は曜日で体制が変わる。5人、週の回数の目安つき',build:()=>tplBuild({
+   facility:'サンプル事業所 窓口・作業室',settings:{intMode:'common',consec:2},
+   patterns:[{name:'窓口',code:'窓',fair:false,maxW:null,maxO:null,slots:[{name:'終日',abbr:'終',start:'08:30',end:'17:15',days:WKD,hol:'exclude'},{name:'早上がり',abbr:'早',start:'08:30',end:'15:30',days:WKD,hol:'exclude'},{name:'午後',abbr:'午',start:'13:00',end:'17:15',days:WKD,hol:'exclude'}],combos:[{'終日':1},{'早上がり':1,'午後':1}]},
+     {name:'作業室',code:'作',fair:false,spread:true,maxW:null,maxO:null,slots:[{name:'長日（月水）',abbr:'長',start:'08:30',end:'17:00',need:1,days:dset([1,3]),hol:'exclude'},{name:'長日（木）',abbr:'長',start:'08:30',end:'17:00',need:1,days:dset([4]),hol:'exclude'},{name:'短日（火金）',abbr:'短',start:'08:30',end:'15:30',need:1,days:dset([2,5]),hol:'exclude'}]}],
+   users:[{n:'小川',p:['窓口'],o:{wk:[2,2],avoid:[1],avoidAfterHol:true,slotMax:{'窓口/早上がり':2,'窓口/午後':0}}},
+     {n:'斉藤',p:['窓口','作業室'],o:{wk:[2,3],consec:3,share:{'窓口':60,'作業室':40},slotMax:{'窓口/午後':0}}},
+     {n:'松本',p:['窓口','作業室'],o:{wk:[2,3],share:{'窓口':40,'作業室':60},slotMax:{'窓口/午後':0}}},
+     {n:'井上',p:['作業室'],o:{wk:[3,3],consec:3}},
+     {n:'木村',p:['窓口'],o:{wk:[2,3],slotMax:{'窓口/終日':0,'窓口/早上がり':0},pref:[[2,4],70]}}],
    balance:[['斉藤','松本','ge',1],['井上','*','gt']]})},
- {k:'clinic',title:'クリニック：受付・看護',desc:'午前（月〜土）と午後（月火水金）。木曜・日曜・祝日は休診。受付4人・看護3人',build:()=>tplBuild({
-   facility:'サンプルクリニック',settings:{intMode:'common',consec:5},
+ {k:'shop',title:'店舗：受付・スタッフ',desc:'午前（月〜土）と午後（月火水金）。木曜・日曜・祝日は定休。受付4人・スタッフ3人',build:()=>tplBuild({
+   facility:'サンプル店舗',settings:{intMode:'common',consec:5},
    patterns:[{name:'受付',code:'受',maxW:2,maxO:4,slots:[{name:'午前',abbr:'前',start:'09:00',end:'12:30',need:2,days:dset([1,2,3,5,6]),hol:'exclude'},{name:'午後',abbr:'後',start:'15:00',end:'18:30',need:2,days:dset([1,2,3,5]),hol:'exclude'}]},
-     {name:'看護',code:'看',maxW:2,maxO:4,slots:[{name:'午前',abbr:'前',start:'09:00',end:'12:30',need:2,days:dset([1,2,3,5,6]),hol:'exclude'},{name:'午後',abbr:'後',start:'15:00',end:'18:30',need:1,days:dset([1,2,3,5]),hol:'exclude'}]}],
+     {name:'スタッフ',code:'ス',maxW:2,maxO:4,slots:[{name:'午前',abbr:'前',start:'09:00',end:'12:30',need:2,days:dset([1,2,3,5,6]),hol:'exclude'},{name:'午後',abbr:'後',start:'15:00',end:'18:30',need:1,days:dset([1,2,3,5]),hol:'exclude'}]}],
    users:[{n:'山田',p:['受付']},{n:'森',p:['受付']},{n:'池田',p:['受付'],o:{slotMax:{'受付/午後':0}}},{n:'阿部',p:['受付'],o:{ng:[6]}},
-     {n:'中川',p:['看護']},{n:'原',p:['看護']},{n:'岡本',p:['看護'],o:{slotMax:{'看護/午後':0}}}]})}];
+     {n:'中川',p:['スタッフ']},{n:'原',p:['スタッフ']},{n:'岡本',p:['スタッフ'],o:{slotMax:{'スタッフ/午後':0}}}]})}];
 function rTemplates(){
   return `<div class="tplgrid">${TEMPLATES.map(t=>`<div class="tplcard"><b>${esc(t.title)}</b><p>${esc(t.desc)}</p><button class="small outline" data-act="tpl" data-k="${t.k}">この見本で始める</button></div>`).join('')}</div>`;
 }
