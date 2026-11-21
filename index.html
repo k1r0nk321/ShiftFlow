@@ -349,6 +349,17 @@ body{background:#eef3f3}
 .tb-right{display:flex;align-items:center;gap:10px;margin-left:auto}
 .facility{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:7px 14px;font-size:14px;font-weight:700;background:#fff;box-shadow:var(--shadow)}
 .facility svg{width:18px;height:18px;color:var(--pri)}
+button.facility{cursor:pointer;color:var(--ink);font-family:inherit;max-width:280px}
+button.facility .fname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+button.facility svg:last-child{width:14px;height:14px;color:var(--sub);flex:0 0 auto}
+.odrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.odhol{display:inline-flex;align-items:center;gap:3px;font-size:13px}
+.pagehead .teamm{margin-left:auto;max-width:52vw;font-size:13px;padding:6px 10px}
+#helpModal .tlist{border-top:1px solid var(--line)}
+#helpModal .trow{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+#helpModal .tpick{flex:1;min-width:0;display:flex;align-items:center;gap:6px;text-align:left;border:0;background:none;font-weight:700;font-size:15px;padding:8px 4px;color:var(--ink);box-shadow:none}
+#helpModal .tpick span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#helpModal .trow.on .tpick{color:var(--pri)}
+#helpModal .tpick svg{width:18px;height:18px;flex:0 0 auto}
 .iconbtn{border:0;background:none;position:relative;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0;color:var(--ink)}
 .iconbtn:hover{background:#f0f5f4}
 .iconbtn svg{width:24px;height:24px}
@@ -491,6 +502,8 @@ table.mlist td{padding:10px 8px}
 .helpbtn{width:34px;height:34px;border-radius:50%;border:2px solid var(--pri);background:#fff;color:var(--pri);font-size:19px;font-weight:800;line-height:1;padding:0;display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px;box-shadow:var(--shadow);cursor:pointer}
 .helpbtn:hover{background:var(--pri);color:#fff}
 .hero{position:relative}
+.hero .teamh{position:absolute;top:10px;left:12px;margin:0;max-width:70%;font-size:13px;padding:6px 10px;z-index:1}
+@media (max-width:900px){.hero{padding-top:50px!important}}
 .hb-hero{position:absolute;top:10px;right:10px;margin:0;width:32px;height:32px;font-size:18px}
 #helpModal .mback{position:fixed;inset:0;background:rgba(10,30,28,.4);z-index:70}
 #helpModal .mpanel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(760px,94vw);max-height:88vh;background:#fff;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.25);z-index:71;display:flex;flex-direction:column;overflow:hidden}
@@ -559,7 +572,7 @@ const toMin=t=>{const m=/^(\d{1,2}):(\d{2})/.exec(t||'');return m?(+m[1])*60+(+m
 const isNum=v=>typeof v==='number'&&isFinite(v);
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),2600)}
 function nextMonth(){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+1);return d.getFullYear()+'-'+pad(d.getMonth()+1)}
-function blankSp(){return{ng:[],intD:null,intH:null,max:null,maxW:null,maxO:null,offPrev:null,slotMax:{},wkMin:null,wkMax:null,patShare:{},prefDays:allDays(false),prefShare:null,consecMax:null}}
+function blankSp(){return{ng:[],intD:null,intH:null,max:null,maxW:null,maxO:null,maxOD:null,offPrev:null,slotMax:{},wkMin:null,wkMax:null,patShare:{},prefDays:allDays(false),prefShare:null,consecMax:null}}
 function defSettings(){return{offPrev:false,intMode:'common',keep:null,consec:null,startDay:1,gas:{url:'',key:''},facility:''}}
 function addMonth(m,k){const [y,mm]=m.split('-').map(Number);const d=new Date(y,mm-1+k,1);return d.getFullYear()+'-'+pad(d.getMonth()+1)}
 function thisMonth(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)}
@@ -567,8 +580,17 @@ const ymLabel=m=>{const [y,mm]=m.split('-').map(Number);return `${y}年${mm}月`
 function allDays(v){return [v,v,v,v,v,v,v]}
 
 /* ---------- 保存 ---------- */
-function load(){try{const t=localStorage.getItem(KEY);return t?JSON.parse(t):null}catch(e){return null}}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('この端末に保存できませんでした。「保存・読込」からファイルに書き出してください')}}
+/* チーム：チームごとに別々に保存（1つ目のチームは従来の保存場所をそのまま使う） */
+const TKEY=KEY+'-teams';
+function lsGet(k){try{const t=localStorage.getItem(k);return t?JSON.parse(t):null}catch(e){return null}}
+let TM=(()=>{const t=lsGet(TKEY);return t&&Array.isArray(t.list)&&t.list.length?t:{cur:'t1',list:[{id:'t1',name:''}]}})();
+if(!TM.list.some(x=>x.id===TM.cur))TM.cur=TM.list[0].id;
+const tKey=id=>id==='t1'?KEY:KEY+'::'+id;
+function saveTM(){try{localStorage.setItem(TKEY,JSON.stringify(TM))}catch(e){}}
+const teamName=(t,i)=>t.name||`チーム${i+1}`;
+function curTeamLabel(){const i=TM.list.findIndex(x=>x.id===TM.cur);return S.settings.facility||teamName(TM.list[i]||{},i<0?0:i)}
+function load(){return lsGet(tKey(TM.cur))}
+function save(){try{localStorage.setItem(tKey(TM.cur),JSON.stringify(S));const t=TM.list.find(x=>x.id===TM.cur);if(t&&t.name!==(S.settings.facility||'')){t.name=S.settings.facility||'';saveTM()}}catch(e){toast('この端末に保存できませんでした。「保存・読込」からファイルに書き出してください')}}
 
 
 /* ===== 見本（テンプレート）：選ぶだけで、パターン・メンバー・条件がまとめて入る ===== */
@@ -636,9 +658,50 @@ function rTemplates(){
 }
 function loadTemplate(k,ask){
   const t=TEMPLATES.find(x=>x.k===k);if(!t)return false;
-  if(ask&&!confirm(`見本「${t.title}」で始めますか？\n今の内容は置き換わります（残したい場合は、先に「保存・出力」→「ファイルに書き出す」で保存してください）。`))return false;
-  S=t.build();UI.tab='home';UI.openU=new Set();UI.openP=new Set();save();render();toast(`見本「${t.title}」を読み込みました`);return true;
+  if(ask&&!confirm(`見本「${t.title}」で始めますか？\n${TM.list.length>1?'このチームの':''}今の内容は置き換わります（残したい場合は、先に「保存・出力」→「ファイルに書き出す」で保存してください）。`))return false;
+  {const keep=TM.list.length>1?S.settings.facility:'';S=t.build();if(keep)S.settings.facility=keep}UI.tab='home';UI.openU=new Set();UI.openP=new Set();save();render();toast(`見本「${t.title}」を読み込みました`);return true;
 }
+
+function blankState(name){return migrate({v:1,month:nextMonth(),settings:Object.assign(defSettings(),{facility:name||''}),patterns:[],users:[],wishD:{},extraHol:[],results:{},balance:[]})}
+function teamReset(){UI.openU=new Set();UI.openP=new Set();UI.wu=null;UI.hist=null}
+function switchTeam(id){if(id===TM.cur||!TM.list.some(x=>x.id===id))return;save();TM.cur=id;saveTM();S=migrate(load()||blankState(''));teamReset()}
+function addTeam(copy){
+  const nm=prompt(copy?'新しいチームの名前（今のチームの勤務パターンと設定を引き継ぎます。メンバーは空です）':'新しいチームの名前（例：3階病棟、Aチーム）','');
+  if(nm===null)return false;const name=nm.trim();
+  save();const id='t'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  let ns;if(copy){ns=JSON.parse(JSON.stringify(S));Object.assign(ns,{users:[],wishD:{},results:{},balance:[]});ns.settings.facility=name;ns.settings.gas={url:'',key:''};ns=migrate(ns)}else ns=blankState(name);
+  TM.list.push({id,name});TM.cur=id;saveTM();S=ns;save();teamReset();UI.teamOpen=false;
+  toast(`チーム「${name||teamName({},TM.list.length-1)}」を作りました`);return true}
+function renameTeam(id){
+  const i=TM.list.findIndex(x=>x.id===id);if(i<0)return false;const t=TM.list[i];
+  const nm=prompt('チームの名前',t.name||'');if(nm===null)return false;const name=nm.trim();
+  if(id===TM.cur){S.settings.facility=name;save()}else{const d=lsGet(tKey(id));if(d){d.settings=d.settings||{};d.settings.facility=name;try{localStorage.setItem(tKey(id),JSON.stringify(d))}catch(e){}}t.name=name;saveTM()}
+  return true}
+function deleteTeam(id){
+  if(TM.list.length<2){toast('チームが1つのときは削除できません');return false}
+  const i=TM.list.findIndex(x=>x.id===id);if(i<0)return false;
+  if(!confirm(`チーム「${teamName(TM.list[i],i)}」を削除しますか？\nこのチームの勤務パターン・メンバー・希望・勤務表がすべて消えます（先に書き出しておくと安心です）。`))return false;
+  try{localStorage.removeItem(tKey(id))}catch(e){}
+  TM.list.splice(i,1);
+  if(id===TM.cur){TM.cur=TM.list[0].id;S=migrate(load()||blankState(''));teamReset()}
+  saveTM();return true}
+function exportAllTeams(){
+  save();const d=new Date();
+  const teams=TM.list.map((t,i)=>({name:teamName(t,i),data:t.id===TM.cur?S:lsGet(tKey(t.id))})).filter(x=>x.data);
+  download(`勤務表メーカー_全チーム_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}.json`,JSON.stringify({kind:'shiftflow-teams',v:1,teams},null,1),'application/json')}
+function importTeams(d){
+  const ts=d.teams.filter(x=>x&&x.data&&Array.isArray(x.data.patterns));if(!ts.length){toast('このファイルは読み込めません');return}
+  if(!confirm(`${ts.length}チーム（${ts.map(x=>x.name||'名前なし').join('、')}）を、新しいチームとして追加します。よろしいですか？`))return;
+  save();ts.forEach((x,k)=>{const id='t'+Date.now().toString(36)+k+Math.random().toString(36).slice(2,5);const data=migrate(x.data);if(!data.settings.facility&&x.name)data.settings.facility=x.name;
+    try{localStorage.setItem(tKey(id),JSON.stringify(data))}catch(e){}TM.list.push({id,name:data.settings.facility||''})});
+  saveTM();render();toast(`${ts.length}チームを追加しました。画面上のチーム名から切り替えられます`)}
+function teamPanel(){
+  const rows=TM.list.map((t,i)=>`<div class="trow ${t.id===TM.cur?'on':''}"><button class="tpick" data-act="teamPick" data-id="${t.id}">${t.id===TM.cur?ico('check'):''}<span>${esc(t.id===TM.cur?curTeamLabel():teamName(t,i))}</span></button><button class="small" data-act="teamRename" data-id="${t.id}">名前を変える</button>${TM.list.length>1?`<button class="small danger" data-act="teamDel" data-id="${t.id}">削除</button>`:''}</div>`).join('');
+  return `<div class="mback" data-act="teamClose"></div><div class="mpanel" role="dialog" aria-modal="true" aria-label="チームの切り替え" style="width:min(560px,94vw)"><div class="mhead"><h2>${ico('building')}チームの切り替え</h2><button class="iconbtn" data-act="teamClose" aria-label="閉じる">✕</button></div><div class="mbody">
+    <p class="hint" style="margin-top:0">チームごとに、勤務パターン・メンバー・希望・勤務表を別々に保存します。名前を押すと切り替わります。</p>
+    <div class="tlist">${rows}</div>
+    <div class="row" style="gap:8px;margin-top:14px;flex-wrap:wrap"><button class="primary small" data-act="teamAdd">＋ 新しいチーム（空から）</button><button class="small" data-act="teamCopy">＋ 今のチームのパターンを使って作る</button></div>
+    <p class="hint">全チームをまとめて保存・別の端末へ移すときは「保存・出力」→「全チームを書き出す」。</p></div></div>`}
 
 function sampleState(){
   // 見本：どの職場でも使いやすい「日勤・夜勤」の2交代
@@ -656,7 +719,8 @@ function sampleState(){
   return migrate({v:1,month:nextMonth(),settings,patterns:[p1,p2],users,wishD:{},extraHol:[],results:{},balance:[]});
 }
 function migrate(s){
-  s.patterns=s.patterns||[];s.users=s.users||[];s.extraHol=s.extraHol||[];s.results=s.results||{};
+  s.patterns=s.patterns||[];
+  s.patterns.forEach(p=>{if(!Array.isArray(p.offDays))p.offDays=[true,false,false,false,false,false,true];if(typeof p.offHol!=='boolean')p.offHol=true;if(!('maxOD' in p))p.maxOD=null});s.users=s.users||[];s.extraHol=s.extraHol||[];s.results=s.results||{};
   // 希望は実際の日付（YYYY-MM-DD）で保存する。旧形式（月ごと・日の番号）から移し替え
   if(!s.wishD||typeof s.wishD!=='object')s.wishD={};
   if(s.wishes&&typeof s.wishes==='object'){Object.entries(s.wishes).forEach(([m,byU])=>Object.entries(byU||{}).forEach(([u,w])=>Object.entries(w||{}).forEach(([d,v])=>{
@@ -735,6 +799,18 @@ function fmtGap(min){if(min<0)return '重なっている';const d=Math.floor(min
 function periodWishes(uidv,mi){mi=mi||monthInfo();const w=S.wishD[uidv]||{},o={};for(let d=1;d<=mi.nd;d++){const v=w[mi.iso[d]];if(v)o[d]=v}return o}
 function setWish(uidv,d,v){const mi=monthInfo();const w=S.wishD[uidv]||(S.wishD[uidv]={});if(v)w[mi.iso[d]]=v;else delete w[mi.iso[d]]}
 
+/* 曜日を決めた休み希望の上限（例：土日祝は月1日まで）。曜日はパターンの設定、日数は本人の設定があればそちら */
+function odRule(pats,sp){
+  const withN=pats.filter(p=>isNum(p.maxOD)),src=withN.length?withN:pats;
+  const maxOD=isNum(sp.maxOD)?sp.maxOD:(withN.length?Math.max(...withN.map(p=>p.maxOD)):null);
+  const def=[true,false,false,false,false,false,true];
+  const odDays=[0,1,2,3,4,5,6].map(i=>src.length?src.some(p=>(p.offDays||def)[i]):def[i]);
+  const odHol=src.length?src.some(p=>p.offHol!==false):true;
+  return{maxOD,odDays,odHol};
+}
+const odHit=(E,mi,d)=>!!(E.odDays[mi.wd[d]]||(E.odHol&&mi.hol[d]));
+const odLabel=E=>[1,2,3,4,5,6,0].filter(i=>E.odDays[i]).map(i=>WD[i]).join('・')+(E.odHol?(E.odDays.some(Boolean)?'・祝日':'祝日'):'')||'指定の曜日';
+const odCount=(E,mi,days)=>days.filter(d=>odHit(E,mi,d)).length;
 /* ---------- 実際に使う条件（パターン＋本人の特別条件） ---------- */
 function eff(u){
   const pats=S.patterns.filter(p=>u.pats.includes(p.id));const sp=u.sp;
@@ -746,7 +822,7 @@ function eff(u){
   const offPrev=typeof sp.offPrev==='boolean'?sp.offPrev:!!S.settings.offPrev;
   const gC=isNum(S.settings.consec)?S.settings.consec:null,uC=isNum(sp.consecMax)?sp.consecMax:null;
   const consecHard=uC??gC,consecSoft=uC!=null&&gC!=null&&uC>gC?gC:null;
-  return{pats,interval,own,offPrev,consecHard,consecSoft,max:isNum(sp.max)?sp.max:null,maxW:lim(sp.maxW,'maxW'),maxO:lim(sp.maxO,'maxO'),
+  return{pats,interval,own,offPrev,consecHard,consecSoft,max:isNum(sp.max)?sp.max:null,maxW:lim(sp.maxW,'maxW'),maxO:lim(sp.maxO,'maxO'),...odRule(pats,sp),
     hardW:pats.some(p=>p.hardW),hardO:pats.some(p=>p.hardO)};
 }
 function runsOn(s,wd,isH){
@@ -1116,7 +1192,7 @@ const BNAV=['home','pat','usr','wish','gen'];
 function nextNav(tab,label){return `<div class="nextnav noprint"><button class="primary" data-tab="${tab}">${label} →</button></div>`}
 function pageHead(){
   const mi=monthInfo(),t=(TABS.find(x=>x[0]===UI.tab)||TABS[0])[1];
-  return `<div class="pagehead noprint"><h1>${t}</h1>${UI.tab==='home'?`<button class="helpbtn" data-act="helpOpen" aria-label="使い方" title="使い方">?</button>`:''}</div>
+  return `<div class="pagehead noprint"><h1>${t}</h1>${UI.tab==='home'?`<button class="helpbtn" data-act="helpOpen" aria-label="使い方" title="使い方">?</button>`:''}<button class="facility teamm only-m" data-act="teamOpen" title="チームの切り替え">${ico('building')}<span class="fname">${esc(curTeamLabel())}</span>${ico('chevD')}</button></div>
   <div class="phrow noprint"><div class="period">${ico('cal')}<span class="pl">対象期間</span>
     <label class="pselect" title="期間（開始する月）を選ぶ"><b id="plabel">${esc(mi.label)}</b>${ico('chevD')}<input type="month" id="month" value="${S.month}"></label>
     <button data-act="pm" data-k="-1" aria-label="前の期間" id="pprev">${ico('chevL')}</button><button data-act="pm" data-k="1" aria-label="次の期間" id="pnext">${ico('chevR')}</button></div>
@@ -1139,7 +1215,7 @@ function render(){
   $('#side .menu').innerHTML=TABS.map(([k,l,,ic])=>`<button data-tab="${k}" class="${UI.tab===k?'on':''}">${ico(ic)}<span>${l}</span></button>`).join('');
   $('#sideart').innerHTML=ART;
   $('#sidesub').innerHTML=`<button data-act="goSettings">${ico('gear')}<span>設定</span></button><button data-tab="help" class="${UI.tab==='help'?'on':''}">${ico('help')}<span>ヘルプ</span></button>`;
-  $('#facility').innerHTML=S.settings.facility?`<span class="facility">${ico('building')}${esc(S.settings.facility)}</span>`:'';
+  $('#facility').innerHTML=`<button class="facility" data-act="teamOpen" title="チームの切り替え">${ico('building')}<span class="fname">${esc(curTeamLabel())}</span>${ico('chevD')}</button>`;
   $('#bellBtn').innerHTML=ico('bellr')+(ns.some(n=>n.warn)?'<i class="bdot"></i>':'');
   $('#menuBtn').innerHTML=ico('menu');
   $('#bnav').innerHTML=BNAV.map(k=>{const t=TABS.find(x=>x[0]===k);const on=UI.tab===k||(k==='gen'&&UI.tab==='chk')||(k==='home'&&(UI.tab==='hist'||UI.tab==='data'||UI.tab==='help'));return `<button data-tab="${k}" class="${on?'on':''}">${ico(t[3])}<span>${t[2]}</span></button>`}).join('');
@@ -1147,6 +1223,7 @@ function render(){
   document.body.classList.toggle('tab-home',UI.tab==='home');
   let hm=document.getElementById('helpModal');if(!hm){hm=document.createElement('div');hm.id='helpModal';document.body.appendChild(hm)}
   hm.innerHTML=UI.helpOpen?`<div class="mback" data-act="helpClose"></div><div class="mpanel" role="dialog" aria-modal="true" aria-label="使い方"><div class="mhead"><h2>${ico('help')}ShiftFlow の使い方</h2><button class="iconbtn" data-act="helpClose" aria-label="閉じる">✕</button></div><div class="mbody"><p class="hint" style="margin-top:0">上から順に進めると、勤務表ができあがります。</p>${helpContent()}</div></div>`:'';
+  if(UI.teamOpen&&!UI.helpOpen)hm.innerHTML=teamPanel();
   const f={home:rHome,pat:rPatterns,usr:rUsers,wish:rWish,gen:rGen,chk:rCheck,hist:rHist,data:rData,help:rHelp}[UI.tab];
   const head=UI.tab==='help'?`<div class="pagehead"><h1>ヘルプ</h1></div>`:pageHead();
   $('#app').innerHTML=head+f()+({pat:nextNav('usr','次へ：② メンバー登録'),usr:nextNav('wish','次へ：③ 希望入力')}[UI.tab]||'')+(UI.busy?`<div class="busy">勤務表を作成しています…</div>`:'');
@@ -1189,7 +1266,7 @@ function rHome(){
   const wrate=nU?Math.round(wishers/nU*100):0;
   const rate=fs&&fs.req?Math.round(fs.got/fs.req*100):null,lack=fs?fs.req-fs.got:null;
   const stat=(icon,label,val,unit,cls='',vcls='')=>`<div class="stat ${cls}"><div class="si">${ico(icon)}</div><div style="min-width:0"><div class="sl">${label}</div><div class="sv ${vcls}">${val}<small>${unit}</small></div></div></div>`;
-  let h=`<div class="hero only-m"><button class="helpbtn hb-hero" data-act="helpOpen" aria-label="使い方" title="使い方">?</button><div class="ht">シフト管理を、<br>もっとスマートに。</div><div class="hart">${ART}</div></div>`;
+  let h=`<div class="hero only-m"><button class="helpbtn hb-hero" data-act="helpOpen" aria-label="使い方" title="使い方">?</button><button class="facility teamh" data-act="teamOpen" title="チームの切り替え">${ico('building')}<span class="fname">${esc(curTeamLabel())}</span>${ico('chevD')}</button><div class="ht">シフト管理を、<br>もっとスマートに。</div><div class="hart">${ART}</div></div>`;
   h+=`<div class="tiles">${[['pat','grid','勤務パターン','シフトの種類・時間'],['usr','users','メンバー','メンバーの登録・条件'],['wish','calcheck','勤務希望','希望勤務・希望休'],['gen','spark','勤務表作成','自動作成・調整'],['chk','table','勤務表確認','日別・個人別・集計'],['hist','clock','過去の勤務表','過去のデータ参照']].map(([t,i,b,sm])=>`<button class="tile" data-tab="${t}">${ico(i)}<b>${b}</b><small>${sm}</small></button>`).join('')}
     <button class="bigbtn" data-act="solveGo">${ico('plus')}新しい勤務表を作成</button></div>`;
   h+=`<div class="stats">${stat('users','登録メンバー',nU,'名')}${stat('cal','勤務パターン',nP,'種')}
@@ -1274,6 +1351,7 @@ function rPatterns(){
         <label>月間勤務回数の上限（1人あたり）<span>${num(`patterns.${pi}.maxM`,p.maxM,'なし')} 回　<small>空欄＝制限なし</small></span></label>
         <label>勤務希望日の上限（1人あたり）<span>${num(`patterns.${pi}.maxW`,p.maxW,'なし')} 日</span></label>
         <label>休み希望日の上限（1人あたり）<span>${num(`patterns.${pi}.maxO`,p.maxO,'なし')} 日</span></label>
+        <label style="grid-column:1/-1">そのうち、選んだ曜日の休み希望<span class="odrow">${wdBoxes(`patterns.${pi}.offDays`,p.offDays||[true,false,false,false,false,false,true])}<span class="odhol"><input type="checkbox" data-path="patterns.${pi}.offHol" ${p.offHol!==false?'checked':''}>祝日</span> ${num(`patterns.${pi}.maxOD`,p.maxOD,'なし')} 日まで</span><small>例：土・日と祝日にチェックして「1」→ 土日祝の休み希望は月1日まで（全体は上の上限まで）。空欄なら曜日による制限なし</small></label>
         <label>勤務希望の扱い<span>${sel(`patterns.${pi}.hardW`,!!p.hardW,{true:'必ずかなえる',false:'できるだけかなえる'})}</span></label>
         <label>休み希望の扱い<span>${sel(`patterns.${pi}.hardO`,!!p.hardO,{true:'必ずかなえる',false:'できるだけかなえる'})}</span></label>
         <label>各メンバーの時間帯<span>${sel(`patterns.${pi}.spread`,!!p.spread,{false:'特に決めない',true:'できるだけ満遍なく'})}</span><small>満遍なく：各人の勤務を、各時間帯の日数の割合に合わせて配分します（例：月水・木・火金の体制にまんべんなく）</small></label>
@@ -1319,7 +1397,7 @@ function rUsers(){
       <button class="danger small" data-act="delUser" data-ui="${ui}">削除</button></div>
       <div class="hint" style="margin-top:8px">入るシフトパターン</div>
       <div class="pats">${S.patterns.map(p=>`<label class="${u.pats.includes(p.id)?'on':''}"><input type="checkbox" data-act="togPat" data-ui="${ui}" data-pid="${p.id}" ${u.pats.includes(p.id)?'checked':''}>${esc(p.name||'(無名)')}</label>`).join('')||'<span class="hint">先にシフトパターンを登録してください</span>'}</div>
-      <details ${sp.ng.length||isNum(sp.intD)||isNum(sp.intH)||isNum(sp.max)||isNum(sp.maxW)||isNum(sp.maxO)||typeof sp.offPrev==='boolean'||isNum(sp.wkMin)||isNum(sp.wkMax)||Object.values(sp.slotMax).some(isNum)||Object.values(sp.patShare).some(isNum)||isNum(sp.prefShare)||isNum(sp.consecMax)?'open':''}><summary>特別な勤務条件</summary>
+      <details ${sp.ng.length||isNum(sp.intD)||isNum(sp.intH)||isNum(sp.max)||isNum(sp.maxW)||isNum(sp.maxO)||isNum(sp.maxOD)||typeof sp.offPrev==='boolean'||isNum(sp.wkMin)||isNum(sp.wkMax)||Object.values(sp.slotMax).some(isNum)||Object.values(sp.patShare).some(isNum)||isNum(sp.prefShare)||isNum(sp.consecMax)?'open':''}><summary>特別な勤務条件</summary>
         <h3>勤務できない時間</h3>
         ${sp.ng.length?`<div class="tablewrap"><table class="edit stack"><tr><th>扱い</th><th>終日</th><th>開始</th><th>終了</th><th>曜日</th><th>祝日も</th><th>祝日の翌日も</th><th></th></tr>
         ${sp.ng.map((r,ri)=>{const R=`${P}.ng.${ri}`;return `<tr><td data-label="扱い">${sel(R+'.soft',!!r.soft,{false:'不可',true:'できれば避ける'})}</td><td data-label="終日"><input type="checkbox" data-path="${R}.allDay" data-rr ${r.allDay?'checked':''}></td>
@@ -1335,6 +1413,7 @@ function rUsers(){
           <label>月間勤務回数の上限（全パターン合計）<span>${num(P+'.max',sp.max)} 回</span></label>
           <label>勤務希望日の上限<span>${num(P+'.maxW',sp.maxW)} 日</span></label>
           <label>休み希望日の上限<span>${num(P+'.maxO',sp.maxO)} 日</span></label>
+          <label>そのうち、パターンで選んだ曜日（${esc(odLabel(E))}）の休み希望<span>${num(P+'.maxOD',sp.maxOD)} 日まで</span></label>
           <label>連続勤務の上限<span>${num(P+'.consecMax',sp.consecMax,S.settings.consec??'なし')} 日まで</span><small>全体の上限より大きくすると「基本は全体の上限まで、どうしても必要なときだけこの日数まで」になります</small></label>
           <label>休み希望日の前の晩の夜勤<span>${sel(P+'.offPrev',sp.offPrev==null?'':sp.offPrev,{'':`全体の設定どおり（${S.settings.offPrev?'入れない':'入れてよい'}）`,false:'入れてよい',true:'入れない'})}</span><small>「入れない」：休み希望日の前の晩の夜勤（休み希望日の朝まで続く勤務）にも入らない</small></label>
         </div>
@@ -1829,7 +1908,7 @@ function gformPreview(rows,source){
     const both=work.filter(d=>off.includes(d));if(both.length){work=work.filter(d=>!both.includes(d));warn.push(`同じ日に勤務希望と休み希望：${both.map(d=>lab(mi,d)).join('、')}（休み希望として取り込みます）`)}
     if(u){const k=P.U.findIndex(e=>e.id===u.id),av=new Set(P.inst.filter((x,i)=>k>=0&&P.base[i][k]).map(x=>x.d));
       const na=work.filter(d=>!av.has(d));if(na.length){work=work.filter(d=>av.has(d));warn.push(`入れる勤務がない日の勤務希望：${na.map(d=>lab(mi,d)).join('、')}（取り込みません）`)}
-      const E=eff(u);if(E.maxW!=null&&work.length>E.maxW)warn.push(`勤務希望が上限（${E.maxW}日）を超えています`);if(E.maxO!=null&&off.length>E.maxO)warn.push(`休み希望が上限（${E.maxO}日）を超えています`)}
+      const E=eff(u);if(E.maxW!=null&&work.length>E.maxW)warn.push(`勤務希望が上限（${E.maxW}日）を超えています`);if(E.maxO!=null&&off.length>E.maxO)warn.push(`休み希望が上限（${E.maxO}日）を超えています`);if(E.maxOD!=null&&odCount(E,mi,off)>E.maxOD)warn.push(`${odLabel(E)}の休み希望が上限（${E.maxOD}日）を超えています`)}
     else warn.push('名簿にいない名前です（取り込みません）');
     return{name:r.name,uid:u?u.id:null,work,off,note:String(r.note||''),warn};
   });
@@ -1903,7 +1982,7 @@ function rWish(){
   const nW=Object.values(w).filter(v=>v==='W').length,nO=Object.values(w).filter(v=>v==='O').length;
   h+=`<section class="card"><h2>${esc(u.name)}さんの希望</h2>
     <div class="counter"><span>勤務希望：<b class="${E.maxW!=null&&nW>E.maxW?'over':''}">${nW}</b>${E.maxW==null?'日（上限なし）':` / ${E.maxW}日`}</span>
-    <span>休み希望：<b class="${E.maxO!=null&&nO>E.maxO?'over':''}">${nO}</b>${E.maxO==null?'日（上限なし）':` / ${E.maxO}日`}</span></div>
+    <span>休み希望：<b class="${E.maxO!=null&&nO>E.maxO?'over':''}">${nO}</b>${E.maxO==null?'日（上限なし）':` / ${E.maxO}日`}</span>${E.maxOD!=null?(()=>{const n=odCount(E,mi,Object.keys(w).filter(k=>w[k]==='O').map(Number));return `<span>うち${esc(odLabel(E))}：<b class="${n>E.maxOD?'over':''}">${n}</b> / ${E.maxOD}日</span>`})():''}</div>
     <div class="seg modes"><button class="mW ${UI.mode==='W'?'on':''}" data-act="mode" data-m="W">勤務希望</button><button class="mO ${UI.mode==='O'?'on':''}" data-act="mode" data-m="O">休み希望</button><button class="mX ${UI.mode==='X'?'on':''}" data-act="mode" data-m="X">消す</button></div>
     <div class="cal">${[0,1,2,3,4,5,6].map(i=>`<div class="hd c${i}">${WD[i]}</div>`).join('')}
     ${'<div class="cell empty"></div>'.repeat(mi.wd[1])}
@@ -2035,14 +2114,14 @@ function download(fn,text,type){const b=new Blob([text],{type:type+';charset=utf
 
 function rData(){
   return `<div class="lead">データはこのブラウザの中に自動で保存されています。ただし、ブラウザの履歴を消したり、別のパソコンで開いたりすると見えなくなります。<b>定期的にファイルに書き出して</b>保管してください。</div>
-  <section class="card"><h2>${ico('building')}施設名・部署名</h2><div class="row"><input type="text" style="flex:1;min-width:220px" data-path="settings.facility" data-rr value="${esc(S.settings.facility||'')}" placeholder="例：サンプル株式会社 ○○店（画面の上に表示されます）"></div></section>
+  <section class="card"><h2>${ico('building')}チーム名（施設名・部署名）</h2><div class="row"><input type="text" style="flex:1;min-width:220px" data-path="settings.facility" data-rr value="${esc(S.settings.facility||'')}" placeholder="例：サンプル株式会社 ○○店（画面の上に表示されます）"></div></section>
   <section class="card"><h2>バックアップ</h2><div class="row">
     <button class="primary" data-act="export">ファイルに書き出す（.json）</button>
-    <button data-act="import">ファイルから読み込む</button></div>
-    <p class="hint">書き出したファイルを別のパソコンで読み込めば、同じ設定で使えます。読み込むと、今の内容は置き換わります。</p></section>
+    <button data-act="import">ファイルから読み込む</button>${TM.list.length>1?'<button data-act="exportAll">全チームを書き出す</button>':''}</div>
+    <p class="hint">書き出したファイルを別のパソコンで読み込めば、同じ設定で使えます。読み込むと、${TM.list.length>1?'今のチームの':'今の'}内容は置き換わります。${TM.list.length>1?'「全チームを書き出す」で作ったファイルを読み込むと、チームとして追加されます。':''}<br>チームを増やす・切り替えるときは、画面上のチーム名のボタンから。</p></section>
   <section class="card" id="tplCard"><h2>${ico('grid')}見本から始める</h2><p class="hint">職場に近い見本を選ぶと、勤務パターン・メンバー・条件がまとめて入ります。名前や人数を直して使ってください。<b>今の内容は置き換わります</b>（残したい場合は先に上の「ファイルに書き出す」で保存）。</p>${rTemplates()}</section>
   <section class="card"><h2>最初からやり直す</h2><div class="row">
-    <button class="danger" data-act="reset">すべて消して空にする</button></div></section>
+    <button class="danger" data-act="reset">${TM.list.length>1?'このチームを空にする':'すべて消して空にする'}</button></div></section>
   <section class="card"><h2>このアプリについて</h2><p class="hint">ShiftFlow は、インターネットに接続せず、この端末の中だけで動きます（Googleフォーム連携を使うときを除く）。勤務表は「焼きなまし法」という最適化の計算で作っています（生成AIは使っていません）。前の期間の勤務表がこのアプリにあれば、期間の始めのインターバル・連勤にその勤務を考慮します。</p></section>`;
 }
 
@@ -2073,7 +2152,7 @@ document.addEventListener('change',e=>{
       try{text=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(x){try{text=new TextDecoder('shift_jis').decode(buf)}catch(y){text=new TextDecoder('utf-8').decode(buf)}}
       try{UI.csv=rosterPreview(text)}catch(x){console.error(x);UI.csv={err:'CSVを読めませんでした：'+x.message}}
       el.value='';render()};rd.readAsArrayBuffer(f);return}
-  if(el.id==='fileIn'){const f=el.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!d||!Array.isArray(d.patterns))throw 0;S=migrate(d);save();render();toast('読み込みました')}catch(x){toast('このファイルは読み込めません')}el.value=''};rd.readAsText(f);return}
+  if(el.id==='fileIn'){const f=el.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(d&&d.kind==='shiftflow-teams'&&Array.isArray(d.teams)){importTeams(d);el.value='';return}if(!d||!Array.isArray(d.patterns))throw 0;{const keep=TM.list.length>1?S.settings.facility:'';S=migrate(d);if(keep)S.settings.facility=keep}save();render();toast('読み込みました')}catch(x){toast('このファイルは読み込めません')}el.value=''};rd.readAsText(f);return}
   const path=el.dataset.path;if(!path)return;
   let v;
   if(el.type==='checkbox')v=el.checked;
@@ -2088,6 +2167,7 @@ document.addEventListener('click',e=>{const l=e.target.closest('.pselect');if(!l
 document.addEventListener('toggle',e=>{if(e.target&&e.target.id==='gfbox'){UI.gopen=e.target.open;return}});
 document.addEventListener('toggle',e=>{const el=e.target;if(!el.matches||!el.matches('details.ucard'))return;const set=el.dataset.pid?UI.openP:UI.openU,id=el.dataset.pid||el.dataset.uid;
   if(el.open)set.add(id);else set.delete(id);const t=el.querySelector('.tog');if(t)t.textContent=el.open?'閉じる':''},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&UI.teamOpen){UI.teamOpen=false;render()}});
 document.addEventListener('click',e=>{
   const t=e.target.closest('[data-tab]');if(t){UI.drawer=false;UI.helpOpen=false;UI.tab=t.dataset.tab;render();window.scrollTo(0,0);return}
   const b=e.target.closest('[data-act]');if(!b)return;
@@ -2118,6 +2198,14 @@ document.addEventListener('click',e=>{
     drawer(){UI.drawer=!UI.drawer},
     helpOpen(){UI.helpOpen=true},
     helpClose(){UI.helpOpen=false},
+    teamOpen(){UI.drawer=false;UI.helpOpen=false;UI.teamOpen=true},
+    teamClose(){UI.teamOpen=false},
+    teamPick(){const was=TM.cur;switchTeam(D.id);UI.teamOpen=false;if(was!==TM.cur)toast(`「${curTeamLabel()}」に切り替えました`)},
+    teamAdd(){if(!addTeam(false))return false},
+    teamCopy(){if(!addTeam(true))return false},
+    teamRename(){if(!renameTeam(D.id))return false},
+    teamDel(){if(!deleteTeam(D.id))return false},
+    exportAll(){exportAllTeams();return false},
     bell(){UI.tab='home';UI.drawer=false;save();render();setTimeout(()=>{const el=$('#noticeCard');if(el)el.scrollIntoView({behavior:'smooth',block:'center'})},30);return false},
     goSettings(){UI.tab='pat';UI.drawer=false;save();render();setTimeout(()=>{const el=$('#globalSettings');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},30);return false},
     goPat(){const pi=D.pi;const pp=S.patterns[pi];if(pp){UI.openP.add(pp.id);render()}setTimeout(()=>{const el=$('#pat-'+pi);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})},30);return false},
@@ -2147,6 +2235,7 @@ document.addEventListener('click',e=>{
       const cnt=Object.values(w).filter(v=>v===UI.mode).length;
       const lim=UI.mode==='W'?E.maxW:E.maxO;
       if(lim!=null&&cnt>=lim){toast(`${UI.mode==='W'?'勤務希望':'休み希望'}は${lim}日までです`);return false}
+      if(UI.mode==='O'&&E.maxOD!=null){const mi=monthInfo();if(odHit(E,mi,d)&&odCount(E,mi,Object.keys(w).filter(k=>w[k]==='O').map(Number))>=E.maxOD){toast(`${odLabel(E)}の休み希望は${E.maxOD}日までです`);return false}}
       if(UI.mode==='W'){const P=buildProblem(),k=P.U.findIndex(x=>x.id===u.id);if(!P.inst.some((x,i)=>x.d===+d&&k>=0&&P.base[i][k])){toast('この日はこの人が入れる勤務がありません');return false}}
       setWish(u.id,d,UI.mode)},
     solve(){UI.busy=true;render();setTimeout(()=>{let res;try{res=solveAll(UI.budget)}catch(x){console.error(x);res={month:S.month,created:new Date().toLocaleString('ja-JP'),pre:true,ok:false,errors:['計算中にエラーが起きました：'+x.message]}}
@@ -2175,7 +2264,7 @@ document.addEventListener('click',e=>{
     import(){$('#fileIn').click();return false},
     sample(){if(!confirm('今の内容を消して、見本データにしますか？'))return false;S=sampleState()},
     tpl(){loadTemplate(D.k,true);return false},
-    reset(){if(!confirm('すべてのデータを消します。よろしいですか？（先にバックアップをおすすめします）'))return false;S=migrate({v:1,month:nextMonth(),settings:defSettings(),patterns:[],users:[],wishD:{},extraHol:[],results:{},balance:[]})}
+    reset(){if(!confirm(TM.list.length>1?`チーム「${curTeamLabel()}」のデータをすべて消します。よろしいですか？（先にバックアップをおすすめします）`:'すべてのデータを消します。よろしいですか？（先にバックアップをおすすめします）'))return false;S=blankState(TM.list.length>1?S.settings.facility:'');teamReset()}
   };
   if(!A[a])return;
   if(A[a]()===false)return;
