@@ -236,6 +236,13 @@ table.mlist tr.mrow{cursor:pointer}table.mlist tr.mrow:hover td{background:#f5fa
 .chipsP{display:flex;flex-wrap:wrap;gap:4px}
 .cond{font-size:12px;color:var(--sub)}
 details.ucard{padding:0}
+.ulist{border-top:1px solid var(--line);margin:4px -16px 0}
+.ulist details.ucard{margin:0;border-top:0;padding:0;border-bottom:1px solid var(--line);background:none}
+.ulist details.ucard>summary.usum{padding:8px 16px;flex-wrap:nowrap}
+.ulist details.ucard>summary.usum .chipsP{flex:0 0 auto}
+.ulist details.ucard[open]{background:#fbfdfd}
+details.ucard>summary.usum .ucond{font-size:12px;color:var(--sub);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+details.ucard>summary.usum{cursor:pointer}
 details.ucard>summary.usum{list-style:none;padding:12px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:15px;color:var(--ink)}
 details.ucard>summary.usum::-webkit-details-marker{display:none}
 details.ucard>summary.usum .tog{margin-left:auto;font-size:12px;color:var(--pri)}
@@ -1349,13 +1356,13 @@ function condText(u){
 function rUsers(){
   let h=`<div class="lead">メンバー（名前）を登録し、入るシフトパターンを選びます（複数選べます）。<br>一覧の行を押すと、その人の設定が開きます。空欄の項目はパターンの設定どおりになります。</div>`;
   h+=`<section class="card"><div class="cardhead"><h2>${ico('users')}メンバー一覧</h2><button class="primary small" data-act="addUser">＋ メンバー追加</button></div>
-    <div class="tablewrap"><table class="mlist"><tr><th>名前</th><th>担当可能パターン</th><th>個別条件</th></tr>
-    ${S.users.map(u=>`<tr class="mrow" data-act="openU" data-id="${u.id}"><td><span class="who">${avatar(u.name)}${esc(u.name||'(名前なし)')}</span></td><td><span class="chipsP">${S.patterns.map((p,pi)=>u.pats.includes(p.id)?pcodeBadge(pi):'').join('')||'<span class="hint">未選択</span>'}</span></td><td class="cond">${esc(condText(u))}</td></tr>`).join('')||'<tr><td colspan="3" class="hint">まだいません</td></tr>'}</table></div></section>`+rRosterCsv();
+    <div class="ulist">`;
   S.users.forEach((u,ui)=>{
     const E=eff(u),sp=u.sp,P=`users.${ui}.sp`;
     const lim=v=>v==null?'制限なし':v+'日まで';
     const open=UI.openU.has(u.id);
-    h+=`<details class="card ucard" data-uid="${u.id}" ${open?'open':''}><summary class="usum">${avatar(u.name)}<b>${esc(u.name||'(名前なし)')}</b><span class="chipsP">${S.patterns.map((p,pi)=>u.pats.includes(p.id)?pcodeBadge(pi):'').join('')}</span><span class="tog">${open?'閉じる':'設定を開く'}</span></summary><div class="ubody">
+    const ct=condText(u);
+    h+=`<details class="ucard" data-uid="${u.id}" ${open?'open':''}><summary class="usum">${avatar(u.name)}<b>${esc(u.name||'(名前なし)')}</b><span class="chipsP">${S.patterns.map((p,pi)=>u.pats.includes(p.id)?pcodeBadge(pi):'').join('')||'<span class="hint">パターン未選択</span>'}</span>${ct!=='—'?`<span class="ucond">${esc(ct)}</span>`:''}<span class="tog">${open?'閉じる':'設定を開く'}</span></summary><div class="ubody">
     <div class="cardhead"><input type="text" class="title" style="width:220px" data-path="users.${ui}.name" value="${esc(u.name)}" placeholder="名前">
       <button class="danger small" data-act="delUser" data-ui="${ui}">削除</button></div>
       <div class="hint" style="margin-top:8px">入るシフトパターン</div>
@@ -1392,7 +1399,7 @@ function rUsers(){
       <div class="eff">この人に使う条件：次の勤務までの時間 ${E.own||S.settings.intMode!=='perPattern'?fmtGap(E.interval):'直前の勤務に合わせる'}／連勤 ${E.consecHard==null?'制限なし':(E.consecSoft!=null?`基本${E.consecSoft}日・最大${E.consecHard}日`:E.consecHard+'日まで')}／休み希望日の前の晩の夜勤 ${E.offPrev?'入れない':'入れてよい'}／月の上限 ${E.max==null?'パターンどおり':E.max+'回'}／勤務希望 ${lim(E.maxW)}／休み希望 ${lim(E.maxO)}</div>
     </div></details>`;
   });
-  h+=`<p><button class="primary" data-act="addUser">＋ メンバーを追加</button></p>`;
+  h+=`</div>${S.users.length?'':'<p class="hint">まだいません。「＋ メンバー追加」から登録してください。</p>'}${S.users.length>8?`<p style="margin:12px 0 0"><button class="small" data-act="addUser">＋ メンバーを追加</button></p>`:''}</section>`+rRosterCsv();
   const uo={};S.users.forEach(u=>uo[u.id]=u.name||'(名前なし)');const uo2=Object.assign({},uo,{'*':'他の全員'});
   h+=`<section class="card"><h2>メンバー間の回数のバランス</h2>
     <p class="hint">人と人の勤務回数（月の合計）の関係を決めます。できるだけ守ります（守れないときは結果に表示）。<br>例：「DDさんをEEさんと同じか多く・差は1回まで」＝ほぼ同じで、違うときはDDさんが多い。「FFさんを他の全員より多く」「GGさんをHHさんより少なく」</p>
